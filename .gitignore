@@ -1,35 +1,27 @@
-node_modules
-.idea
+# Node
+node_modules/
+dist/
+*.log
 .DS_Store
-dist-ssr
-*.local
-.vscode
-out
-.next
-yarn-error.log
 .env
-package-lock.json
-yarn.lock
+.env.local
+.env.*.local
+
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+prisma/migrations/dev/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Vite
+.vite/
+
+# TypeScript incremental build
 *.tsbuildinfo
-.scannerwork
-.tsbuildinfo
-public/robots.txt
-public/sitemap*
-public/assets
-.blinko/*
-dump.sql
-public/sw*
-public/plugins/*
-public/workbox*.*
-seed.js
-dist
-.turbo
-keystore.properties
-!**/lute.min.js
-.blinko
-dev-dist
-.claudeconfig
-.claude/*
-.claude/settings.local.json
-target
-server/public
+
+# Bun
+bun.lockb

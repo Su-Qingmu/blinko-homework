@@ -1,147 +1,121 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Blinko-Lite 是基于 [blinkospace/blinko](https://github.com/blinkospace/blinko) 1.8.8 精简而来的课设项目，详见 [SIMPLIFIED.md](./SIMPLIFIED.md)。本文档供 Claude Code 在本仓库工作时参考。
 
-## Project Overview
+## 项目概述
 
-Blinko is an open-source, self-hosted note-taking application with AI-powered features. It's a multi-platform application (web, desktop via Tauri, mobile) built with TypeScript/React frontend and Node.js/Express backend.
+**一句话**：让 AI 对话中的每一个灵感都成为可复习的知识资产。
 
-## Tech Stack
+**核心功能（5 个）**：笔记 / 闪念 / AI 对话 / AI 自动评论 / 用户登录。
 
-- **Frontend**: React 18, TypeScript, Vite, TailwindCSS, Tauri (for desktop apps)
-- **Backend**: Node.js, Express, tRPC, Prisma ORM
-- **Database**: PostgreSQL
-- **Package Manager**: Bun (v1.2.8+)
-- **Build Tool**: Turbo (monorepo management)
-- **AI**: Multiple AI providers (OpenAI, Anthropic, Google, Azure, Ollama, etc.)
+**砍掉（vs 原版）**：Tauri 桌面端 / 多 AI Provider / 插件系统 / Mastra 抽象层 / MCP / pg-boss 队列 / 17 国 i18n / PWA / 主题系统。
 
-## Project Structure
+## 技术栈
+
+- **后端**：Node.js 20+ · TypeScript · Express · tRPC 11 · Prisma 5 · SQLite · OpenAI SDK 4
+- **前端**：React 18 · TypeScript · Vite 5 · Tailwind CSS 3 · React Router 6 · TanStack Query 5 · tRPC Client
+- **包管理**：Bun 1.3+
+- **部署**：单 Docker 容器（阶段6实现）
+
+## 仓库结构
 
 ```
-blinko/
-├── app/                    # Frontend React application
-│   ├── src/               # React source code
-│   ├── src-tauri/         # Tauri desktop app configuration
-│   └── tauri-plugin-blinko/ # Custom Tauri plugin
-├── server/                 # Backend Node.js server
-│   ├── aiServer/          # AI integration services
-│   ├── routerTrpc/        # tRPC API routes
-│   └── routerExpress/     # Express API routes
-├── prisma/                # Database schema and migrations
-├── shared/                # Shared utilities and types
-└── blinko-types/         # Type definitions
+blinko-homework/
+├── prisma/schema.prisma       # 6 models: Account / Session / Note / Tag / Comment / Conversation / Message
+├── server/
+│   └── src/
+│       ├── index.ts           # Express 入口
+│       ├── trpc/
+│       │   ├── trpc.ts        # initTRPC + protectedProcedure
+│       │   ├── context.ts     # 注入 prisma + account + res
+│       │   └── routers/       # user / note / comment / ai
+│       └── lib/
+│           ├── prisma.ts      # 单例 PrismaClient
+│           ├── auth.ts        # bcrypt + session token
+│           └── openai.ts      # OpenAI 单例（阶段5）
+├── app/
+│   ├── vite.config.ts         # /trpc 代理 → :4000
+│   └── src/
+│       ├── main.tsx           # tRPC + ReactQuery Provider
+│       ├── App.tsx            # 路由守卫
+│       ├── lib/trpc.ts        # 类型化 tRPC 客户端
+│       └── pages/             # SignIn / Home（阶段3+ 加入 Notes/NoteDetail/QuickNote/AIChat）
+├── docs/                      # 课设文档（立项书/需求规格/系统设计/使用说明）
+└── SIMPLIFIED.md              # 精简方案
 ```
 
-## Common Development Commands
+## 常用命令
 
-### Setup & Installation
 ```bash
-bun install                # Install dependencies
-bun run prisma:generate    # Generate Prisma client
-bun run prisma:migrate:dev # Run database migrations
+bun install                       # 装依赖（workspaces）
+bun run prisma:migrate            # 生成 + 应用 SQLite schema（首次）
+bun run prisma:generate           # 仅生成 Prisma Client
+bun run prisma:studio             # 打开 Prisma Studio 浏览数据
+
+bun run dev                       # 并发启动 server (:4000) + app (:5173)
+bun run dev:server                # 仅后端
+bun run dev:app                   # 仅前端
+
+bun run build                     # 全部构建
+bun run start                     # 生产模式跑 server（需先 build:server）
 ```
 
-### Development
-```bash
-bun run dev                # Run Tauri desktop app in development
-bun run dev:backend        # Run backend server only
-bun run dev:frontend       # Run frontend only
-bun run prisma:studio      # Open Prisma Studio for database management
-```
+## 核心约定
 
-### Building
-```bash
-bun run build:web          # Build web application
-bun run tauri:desktop:build # Build desktop application
-bun run tauri:android:build # Build Android application
-```
+### 1. tRPC 路由组织
+- `user` 路由：`register / login / logout / me`，前三个用 `publicProcedure`（me 也 public，未登录返 null）
+- 其他路由：`protectedProcedure`（自动校验 ctx.account）
+- 输入校验统一用 `zod`
 
-### Database
-```bash
-bun run prisma:migrate:deploy # Deploy migrations to production
-bun run seed               # Seed database with initial data
-```
+### 2. Session 设计
+- cookie 名：`sid`，`httpOnly + sameSite=lax`，30 天过期
+- 服务端：`Session { id: token, accountId, expiresAt }`，过期自动清理
+- 前端：所有 tRPC 请求 `credentials: 'include'`，无需手动管理
 
-### Testing & Linting
-```bash
-bun run test               # Run tests (if configured)
-```
+### 3. 数据隔离
+- 所有查询强制带 `accountId` 过滤（`ctx.account.id`）
+- 标签 `(accountId, name)` 唯一，避免跨用户冲突
 
-## Architecture & Key Components
+### 4. Markdown 渲染
+- 写入：`content` 存 markdown 文本
+- 渲染：`<div className="markdown"><ReactMarkdown>{content}</ReactMarkdown></div>`（阶段3 实现）
+- XSS：依赖 `react-markdown` 自带转义，不引入额外 sanitizer
 
-### Frontend Architecture
-- **State Management**: MobX with custom stores in `/app/src/store/`
-- **Routing**: React Router v7
-- **UI Components**: Custom components with HeroUI (@heroui/react)
-- **Editor**: Vditor for markdown editing
-- **Internationalization**: i18next with multiple language support
-- **API Communication**: tRPC client for type-safe API calls
+### 5. AI 调用
+- 统一通过 `getOpenAI()` 拿单例，未配 `OPENAI_API_KEY` 时直接抛错
+- 默认模型 `gpt-4o-mini`，可通过 `OPENAI_MODEL` 环境变量覆盖
+- 流式：阶段5 用 `openai.chat.completions.create({ stream: true })`，前端通过 tRPC subscription 或独立 SSE 路由消费
 
-### Backend Architecture
-- **API Layer**: Hybrid approach using both tRPC (type-safe) and Express routes
-- **Authentication**: Multiple providers (local, OAuth via passport)
-- **File Storage**: Local filesystem or S3-compatible storage
-- **AI Integration**: Factory pattern for multiple AI providers
-- **Background Jobs**: Cron-based scheduled tasks in `/server/jobs/`
-- **Embeddings**: RAG (Retrieval-Augmented Generation) support with @mastra/rag
+## 阶段路线图（与 SIMPLIFIED.md §八 对齐）
 
-### Database Schema
-- **Main Entities**: accounts, notes, attachments, tags, comments, conversations
-- **ORM**: Prisma with PostgreSQL
-- **Migrations**: Managed through Prisma migrate
+| 阶段 | 内容 | 状态 |
+|---|---|---|
+| 1 | 基础骨架（schema + Express + tRPC + Vite） | ✅ |
+| 2 | 用户系统（register/login/logout/me + SignIn 页） | ✅ |
+| 3 | 笔记核心（Note/Tag CRUD + 列表/详情 + markdown + 搜索） | ⏳ |
+| 4 | 闪念（极简快速输入 + Ctrl+Shift+N） | ⏳ |
+| 5 | AI（流式对话 + 自动评论 + AI 助手页） | ⏳ |
+| 6 | Docker 部署 | ⏳ |
 
-## Environment Configuration
+## 环境变量
 
-Create a `.env` file in the root directory with:
-```
-DATABASE_URL=postgresql://user:password@localhost:5432/blinko
-NEXTAUTH_SECRET=your-secret-key
-NEXTAUTH_URL=http://localhost:1111
+参考 [.env.tmpl](./.env.tmpl)：
+- `DATABASE_URL`：SQLite 文件路径，默认 `file:./dev.db`
+- `PORT`：后端端口，默认 `4000`
+- `CLIENT_ORIGIN`：前端来源，用于 CORS，默认 `http://localhost:5173`
+- `SESSION_SECRET`：保留位（当前未用，bcrypt 自带 salt）
+- `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL`：阶段5 启用
 
-# Optional S3 storage
-S3_ENDPOINT=
-S3_REGION=
-S3_BUCKET=
-S3_ACCESS_KEY=
-S3_SECRET_KEY=
+## 端口
 
-# AI Providers (optional)
-OPENAI_API_KEY=
-ANTHROPIC_API_KEY=
-# ... other AI provider keys
-```
+- 前端：`5173`
+- 后端：`4000`
+- 开发期前端通过 Vite proxy 把 `/trpc` 转到 `:4000`
 
-## Important Patterns
+## 注意事项
 
-1. **File Operations**: Use the filesystem routes in `/server/routerExpress/file/` for file handling
-2. **AI Features**: AI providers are configured in `/server/aiServer/providers/`
-3. **Type Safety**: Use tRPC routes when possible for type-safe API calls
-4. **State Management**: Follow MobX patterns in store files
-5. **Component Structure**: React components follow a modular structure with separate index.tsx files
-
-## Deployment
-
-### Docker
-```bash
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-### Manual Deployment
-1. Build the application: `bun run build:web`
-2. Run migrations: `bun run prisma:migrate:deploy`
-3. Start the server: `bun run start`
-
-## Port Configuration
-- Frontend/Full App: 1111 (default)
-- Backend API: Same port (integrated with Vite Express)
-
-## Mobile Development (Tauri)
-- Android development: `bun run tauri:android:dev`
-- iOS support through Tauri configuration
-- Custom plugin in `/app/tauri-plugin-blinko/`
-
-## Key Dependencies Notes
-- Uses Bun as package manager and runtime
-- Requires Node.js >= 20.0.0
-- PostgreSQL database required
-- Tauri requires Rust toolchain for desktop builds
+1. **不要引入新依赖**除非必要 - 课设要求精简
+2. **不要保留原版 Blinko 风格** - 砍掉 MobX / HeroUI / framer-motion / 多语言 / PWA
+3. **每个阶段完成后单独提交** git，保持 commit 历史清晰
+4. **不要破坏数据隔离** - 所有 user-scoped 查询必须带 accountId
+5. **AI 调用必须走 `getOpenAI()` 单例** - 不要直接 `new OpenAI()`
