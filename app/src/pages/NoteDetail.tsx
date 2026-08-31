@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { trpc } from '../lib/trpc';
 import { MarkdownView } from '../components/MarkdownView';
 import { TagSelector } from '../components/TagSelector';
+import { CommentList } from '../components/CommentList';
 
 /**
  * 笔记详情页 /notes/:id
@@ -171,6 +172,11 @@ export default function NoteDetail() {
                 ))}
               </div>
             )}
+
+            {/* 评论区 */}
+            <div className="mt-6">
+              <CommentList noteId={n.id} />
+            </div>
           </>
         )}
       </main>

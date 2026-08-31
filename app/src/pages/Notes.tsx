@@ -238,7 +238,14 @@ function Header({ nickname }: { nickname?: string }) {
         <Link to="/" className="text-lg font-semibold">
           📝 AI智能笔记
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Link
+            to="/ai"
+            className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-sm text-indigo-600 hover:bg-indigo-50 transition"
+            title="AI 助手 (Ctrl+Shift+I)"
+          >
+            🤖 AI 助手
+          </Link>
           <span className="text-sm text-gray-500 hidden sm:inline">{nickname}</span>
           <button
             className="btn-ghost"

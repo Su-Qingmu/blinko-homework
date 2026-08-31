@@ -5,19 +5,26 @@ import SignIn from './pages/SignIn';
 import Notes from './pages/Notes';
 import NoteDetail from './pages/NoteDetail';
 import QuickNote from './pages/QuickNote';
+import AIChat from './pages/AIChat';
 
 /**
- * 全局快捷键:Ctrl+Shift+N / Cmd+Shift+N → 跳到闪念速记
- * 仅在已登录状态下生效(避免在 /signin 也触发)
+ * 全局快捷键
+ * - Ctrl/Cmd + Shift + N → 闪念速记
+ * - Ctrl/Cmd + Shift + I → AI 助手
+ * 仅在已登录状态下生效
  */
 function GlobalShortcuts({ enabled }: { enabled: boolean }) {
   const navigate = useNavigate();
   useEffect(() => {
     if (!enabled) return;
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'N' || e.key === 'n')) {
+      if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+      if (e.key === 'N' || e.key === 'n') {
         e.preventDefault();
         navigate('/quick');
+      } else if (e.key === 'I' || e.key === 'i') {
+        e.preventDefault();
+        navigate('/ai');
       }
     };
     window.addEventListener('keydown', handler);
@@ -50,6 +57,10 @@ export default function App() {
         <Route
           path="/quick"
           element={isAuthed ? <QuickNote /> : <Navigate to="/signin" replace />}
+        />
+        <Route
+          path="/ai"
+          element={isAuthed ? <AIChat /> : <Navigate to="/signin" replace />}
         />
         <Route
           path="/notes/:id"
