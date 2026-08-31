@@ -1,9 +1,8 @@
 import { initTRPC, TRPCError } from '@trpc/server';
-import superjson from 'superjson';
 import type { Context } from './context.js';
 
 const t = initTRPC.context<Context>().create({
-  transformer: superjson,
+  // 简化:不使用 superjson,直接传 JSON 即可(日期用 ISO string)
 });
 
 export const router = t.router;
