@@ -311,18 +311,9 @@ const initOAuthStrategies = async () => {
 
         // Additional OAuth providers
         case 'spotify':
-          try {
-            const SpotifyStrategy = require('passport-spotify').Strategy;
-            useOAuthStrategy(provider.id, new SpotifyStrategy({
-              clientID: provider.clientId,
-              clientSecret: provider.clientSecret,
-              callbackURL: callbackURL,
-              scope: ['user-read-email', 'user-read-private']
-            }, handleOAuthCallback));
-          } catch (error) {
-            console.error('Spotify strategy requires passport-spotify package');
-            failedProviders.push(provider.id);
-          }
+          // Spotify OAuth disabled in simplified build
+          failedProviders.push(provider.id);
+          console.warn('Spotify OAuth disabled in simplified build');
           break;
 
         case 'apple':

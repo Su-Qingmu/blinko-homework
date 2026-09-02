@@ -6,14 +6,6 @@ import fs from 'fs';
 import authRoutes from './routerExpress/auth';
 import { configureSession } from './routerExpress/auth/config';
 
-// pg-boss job scheduling
-import { getPgBoss, stopPgBoss } from './lib/pgBoss';
-import { ArchiveJob } from './jobs/archivejob';
-import { DBJob } from './jobs/dbjob';
-import { RebuildEmbeddingJob } from './jobs/rebuildEmbeddingJob';
-import { RecommandJob } from './jobs/recommandJob';
-import { AIScheduledTaskJob } from './jobs/aiScheduledTaskJob';
-
 // tRPC related imports
 import { createContext } from './context';
 import { appRouter } from './routerTrpc/_app';
@@ -21,18 +13,11 @@ import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { createOpenApiExpressMiddleware } from 'trpc-to-openapi';
 
 // API documentation
-import swaggerUi from 'swagger-ui-express';
-import { openApiDocument } from './swagger';
+// swagger-ui / swagger-jsdoc removed (no OpenAPI docs in simplified build)
 
 // Express router imports
-import fileRouter from './routerExpress/file/file';
-import uploadRouter from './routerExpress/file/upload';
-import deleteRouter from './routerExpress/file/delete';
-import s3fileRouter from './routerExpress/file/s3file';
-import pluginRouter from './routerExpress/file/plugin';
-import rssRouter from './routerExpress/rss';
 import openaiRouter from './routerExpress/openai';
-import mcpRouter from './routerExpress/mcp';
+
 
 // Vite integration
 import ViteExpress from 'vite-express';
@@ -48,45 +33,17 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
-  await stopPgBoss();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
-  await stopPgBoss();
   process.exit(0);
 });
 
 process.on('exit', (code) => {
   console.log(`process exit, code: ${code}`);
 });
-
-/**
- * Initialize all scheduled jobs
- * This sets up pg-boss and registers all job workers
- */
-async function initializeJobs() {
-  try {
-    console.log('Initializing pg-boss scheduled jobs...');
-    
-    // Start pg-boss
-    await getPgBoss();
-    
-    // Initialize all jobs
-    // These will restore their schedules from the database if they were running
-    await ArchiveJob.initialize();
-    await DBJob.initialize();
-    await RebuildEmbeddingJob.initialize();
-    await RecommandJob.initialize();
-    await AIScheduledTaskJob.initialize();
-    
-    console.log('All scheduled jobs initialized successfully');
-  } catch (error) {
-    console.error('Failed to initialize scheduled jobs:', error);
-    // Don't throw - allow server to start even if jobs fail to initialize
-  }
-}
 
 // Server configuration
 const app = express();
@@ -146,11 +103,6 @@ async function setupApiRoutes(app: express.Application) {
   );
 
   // File handling endpoints
-  app.use('/api/file', fileRouter);
-  app.use('/api/file/upload', uploadRouter);
-  app.use('/api/file/delete', deleteRouter);
-  app.use('/api/s3file', s3fileRouter);
-  
   // Helper function to serve vditor dependencies with gzip compression
   const serveVditorFile = (routePath: string, filePath: string) => {
     app.use(routePath, (req, res) => {
@@ -222,30 +174,9 @@ async function setupApiRoutes(app: express.Application) {
   serveVditorFile('/dist/js/smiles-drawer/smiles-drawer.min.js', './vditor/js/smiles-drawer/smiles-drawer.min.js');
   serveVditorFile('/dist/js/katex/katex.min.js', './vditor/js/katex/katex.min.js');
   serveVditorFile('/dist/js/katex/mhchem.min.js', './vditor/js/katex/mhchem.min.js');
-  app.use('/plugins', pluginRouter);
-
-  // Other API endpoints
-  app.use('/api/rss', rssRouter);
   app.use('/v1', openaiRouter);
 
-  // OpenAPI documentation endpoints
-  app.get('/api/openapi.json', (req, res) => {
-    res.json(openApiDocument);
-  });
-
-  // Swagger UI configuration
-  app.use('/api-doc', swaggerUi.serve, swaggerUi.setup(openApiDocument, {
-    customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Blinko API Document',
-    customfavIcon: '/favicon.ico',
-    swaggerOptions: {
-      persistAuthorization: true,
-      docExpansion: 'list',
-      filter: true
-    }
-  }));
-
-  // OpenAPI integration
+  // OpenAPI integration (kept for client compatibility; OpenAPI docs page removed)
   app.use('/api',
     // @ts-ignore
     createOpenApiExpressMiddleware({
@@ -260,9 +191,6 @@ async function setupApiRoutes(app: express.Application) {
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
-
-
-  app.use('/', mcpRouter);
 }
 
 /**
@@ -307,9 +235,6 @@ async function bootstrap() {
     app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
       errorHandler(err, req, res, next);
     });
-
-    // Initialize scheduled jobs
-    await initializeJobs();
 
     // Start or update server
     if (!server) {

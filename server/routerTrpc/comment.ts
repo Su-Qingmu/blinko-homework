@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../prisma';
 import { commentsSchema, accountsSchema, NotificationType } from '@shared/lib/prismaZodType';
 import * as crypto from 'crypto';
-import { CreateNotification } from './notification';
+// CreateNotification removed (notification router cut in simplified build)
 import { buildCommentWebhookPayload, commentAccountSelect, commentWebhookInclude, sendCommentWebhook } from '@server/lib/commentWebhook';
 
 const accountSchema = accountsSchema.pick({
@@ -223,16 +223,8 @@ export const commentRouter = router({
       });
       sendCommentWebhook('comment.created', comment, ctx);
       if (Number(ctx.id) !== note?.accountId || !ctx.id) {
-        CreateNotification({
-          type: NotificationType.COMMENT,
-          title: 'comment-notification',
-          content: (ctx?.name ?? guestName) + ':' + content,
-          metadata: {
-            noteId,
-            guestName,
-          },
-          accountId: Number(note?.accountId),
-        })
+        // Notification disabled in simplified build
+        void 0;
       }
       return true
     }),

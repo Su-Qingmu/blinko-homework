@@ -1,7 +1,7 @@
-import { LLMProvider, EmbeddingProvider, AudioProvider, AiUtilities } from './providers';
+import { LLMProvider, AiUtilities } from './providers';
 import { upsertBlinkoTool } from './tools/createBlinko';
 import { createCommentTool } from './tools/createComment';
-import { LibSQLVector } from "@mastra/libsql";
+// LibSQLVector removed in simplified build (no vector store)
 import dayjs from 'dayjs';
 import { Agent, Mastra } from '@mastra/core';
 import { LanguageModelV1, EmbeddingModelV1 } from '@ai-sdk/provider';
@@ -14,8 +14,8 @@ import { searchBlinkoTool } from './tools/searchBlinko';
 import { updateBlinkoTool } from './tools/updateBlinko';
 import { deleteBlinkoTool } from './tools/deleteBlinko';
 import { createScheduledTaskTool, deleteScheduledTaskTool, listScheduledTasksTool } from './tools/scheduledTask';
-import { getMcpMastraTools, hasMcpServers } from './mcp';
-import { rerank } from '@mastra/rag';
+// MCP removed in simplified build
+// rerank from @mastra/rag removed in simplified build (no embeddings/RAG)
 import { prisma } from '@server/prisma';
 import { getGlobalConfig } from '@server/routerTrpc/config';
 import fs from 'fs';
@@ -136,65 +136,8 @@ export class AiModelFactory {
     return { notes, aiContext: aiContext };
   }
 
-  static async rebuildVectorIndex({ vectorStore, isDelete = false }: { vectorStore: LibSQLVector; isDelete?: boolean }) {
-    try {
-      if (isDelete) {
-        await vectorStore.deleteIndex({ indexName: 'blinko' });
-      }
-    } catch (error) {
-      console.error('delete vector index failed:', error);
-    }
-
-    const config = await AiModelFactory.globalConfig();
-    const embeddingModel = config.embeddingModelId ? await AiModelFactory.getAiModel(config.embeddingModelId) : null;
-    if (!embeddingModel) {
-      console.warn('Embedding model not configured, skipping vector index creation');
-      return;
-    }
-
-    const model = embeddingModel.modelKey.toLowerCase();
-    let userConfigDimensions = (embeddingModel.config as any)?.embeddingDimensions || 0;
-    let dimensions: number = 0;
-    switch (true) {
-      case model.includes('text-embedding-3-small'):
-        dimensions = 1536;
-        break;
-      case model.includes('text-embedding-3-large'):
-        dimensions = 3072;
-        break;
-      case model.includes('cohere/embed-english-v3') || model.includes('bge-m3') || model.includes('voyage') || model.includes('bge-large'):
-        dimensions = 1024;
-        break;
-      case model.includes('cohere'):
-        dimensions = 4096;
-        break;
-      case model.includes('voyage-3-lite'):
-        dimensions = 512;
-        break;
-      case model.includes('bge') || model.includes('bert') || model.includes('bce-embedding-base'):
-        dimensions = 768;
-        break;
-      case model.includes('all-minilm'):
-        dimensions = 384;
-        break;
-      case model.includes('mxbai-embed-large'):
-        dimensions = 1024;
-        break;
-      case model.includes('nomic-embed-text'):
-        dimensions = 768;
-        break;
-      case model.includes('bge-large-en'):
-        dimensions = 1024;
-        break;
-      default:
-        if (userConfigDimensions == 0 || userConfigDimensions == undefined || !userConfigDimensions) {
-          throw new Error('Must set the embedding dimension in ai Settings > Embed Settings > Advanced Settings');
-        }
-    }
-    if (userConfigDimensions != 0 && userConfigDimensions != undefined) {
-      dimensions = userConfigDimensions;
-    }
-    await vectorStore.createIndex({ indexName: 'blinko', dimension: dimensions, metric: 'cosine' });
+  static async rebuildVectorIndex(_opts: { vectorStore?: any; isDelete?: boolean } = {}) {
+    // Vector index disabled in simplified build (no embeddings/RAG)
   }
 
   static async globalConfig() {
@@ -268,8 +211,7 @@ export class AiModelFactory {
 
     // Initialize providers
     const llmProvider = new LLMProvider();
-    const embeddingProvider = new EmbeddingProvider();
-    const audioProvider = new AudioProvider();
+    // EmbeddingProvider/AudioProvider removed in simplified build
 
     // Create LLM configuration
     const llmConfig = {
@@ -329,7 +271,7 @@ export class AiModelFactory {
       }
     };
   }
-  static async BaseChatAgent({ withTools = true, withOnlineSearch = false, withMcpTools = true, extraInstructions }: { withTools?: boolean; withOnlineSearch?: boolean; withMcpTools?: boolean; extraInstructions?: string }) {
+  static async BaseChatAgent({ withTools = true, withOnlineSearch = false, extraInstructions }: { withTools?: boolean; withOnlineSearch?: boolean; extraInstructions?: string }) {
     const provider = await AiModelFactory.GetProvider();
     let tools: Record<string, any> = {};
     if (withTools) {
@@ -354,24 +296,7 @@ export class AiModelFactory {
       };
     }
 
-    // Load MCP tools if enabled
-    if (withMcpTools && withTools) {
-      try {
-        const hasMcp = await hasMcpServers();
-        if (hasMcp) {
-          const mcpTools = await getMcpMastraTools();
-          if (Object.keys(mcpTools).length > 0) {
-            tools = {
-              tools: { ...tools?.tools, ...mcpTools },
-            };
-            console.log(`[AI] Loaded ${Object.keys(mcpTools).length} MCP tools`);
-          }
-        }
-      } catch (error) {
-        console.error('[AI] Failed to load MCP tools:', error);
-        // Continue without MCP tools - don't break the agent
-      }
-    }
+    // MCP tools removed in simplified build
 
     const globalConfig = await AiModelFactory.globalConfig();
     const defaultInstructions =

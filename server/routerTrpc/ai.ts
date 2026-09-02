@@ -5,7 +5,7 @@ import { prisma } from '../prisma';
 import { TRPCError } from '@trpc/server';
 import { CoreMessage } from '@mastra/core';
 import { AiModelFactory } from '@server/aiServer/aiModelFactory';
-import { RebuildEmbeddingJob } from '../jobs/rebuildEmbeddingJob';
+// RebuildEmbeddingJob removed in simplified build (no embeddings/RAG)
 import { getAllPathTags } from '@server/lib/helper';
 import { ModelCapabilities } from '@server/aiServer/types';
 import { aiProviders, aiModels } from '@shared/lib/prismaZodType';
@@ -204,46 +204,14 @@ export const aiRouter = router({
       return await AiService.AIComment(input)
     }),
 
-  rebuildEmbeddingStart: authProcedure
-    .input(z.object({
-      force: z.boolean().optional(),
-      incremental: z.boolean().optional(),
-    }))
-    .mutation(async ({ input }) => {
-      await RebuildEmbeddingJob.ForceRebuild(input.force ?? true, input.incremental ?? false);
-      return { success: true };
-    }),
-
-  rebuildEmbeddingResume: authProcedure
-    .mutation(async () => {
-      await RebuildEmbeddingJob.ResumeRebuild();
-      return { success: true };
-    }),
-
-  rebuildEmbeddingRetryFailed: authProcedure
-    .mutation(async () => {
-      await RebuildEmbeddingJob.RetryFailedNotes();
-      return { success: true };
-    }),
-
-  rebuildEmbeddingStop: authProcedure
-    .mutation(async () => {
-      await RebuildEmbeddingJob.StopRebuild();
-      return { success: true };
-    }),
-
-  rebuildEmbeddingProgress: authProcedure
-    .query(async () => {
-      const progress = await RebuildEmbeddingJob.GetProgress();
-      return progress || {
-        current: 0,
-        total: 0,
-        percentage: 0,
-        isRunning: false,
-        results: [],
-        lastUpdate: new Date().toISOString()
-      };
-    }),
+  // Embedding procedures removed in simplified build (no RAG / no vector store)
+  rebuildEmbeddingStart: authProcedure.mutation(async () => ({ success: false, message: 'Embeddings disabled in simplified build' })),
+  rebuildEmbeddingResume: authProcedure.mutation(async () => ({ success: false, message: 'Embeddings disabled in simplified build' })),
+  rebuildEmbeddingRetryFailed: authProcedure.mutation(async () => ({ success: false, message: 'Embeddings disabled in simplified build' })),
+  rebuildEmbeddingStop: authProcedure.mutation(async () => ({ success: false, message: 'Embeddings disabled in simplified build' })),
+  rebuildEmbeddingProgress: authProcedure.query(async () => ({
+    current: 0, total: 0, percentage: 0, isRunning: false, results: [], lastUpdate: new Date().toISOString()
+  })),
 
   testConnect: authProcedure
     .input(z.object({
@@ -311,28 +279,9 @@ export const aiRouter = router({
           }
         }
 
-        // Test embedding capability
+        // Embedding test disabled in simplified build
         if (capabilities.embedding) {
-          try {
-            const { EmbeddingProvider } = await import('@server/aiServer/providers');
-            const embeddingProvider = new EmbeddingProvider();
-            const embeddingModel = await embeddingProvider.getEmbeddingModel({
-              provider: provider.provider,
-              apiKey: provider.apiKey,
-              baseURL: provider.baseURL,
-              modelKey,
-              apiVersion: (provider.config as any)?.apiVersion
-            });
-
-            const { embed } = await import('ai');
-            const result = await embed({
-              model: embeddingModel as any,
-              value: 'test embedding'
-            });
-            testResults.embedding = { success: true, dimensions: result.embedding?.length || 0 };
-          } catch (error) {
-            testResults.embedding = { success: false, error: error.message };
-          }
+          testResults.embedding = { success: false, error: 'Embeddings disabled in simplified build' };
         }
 
         // Test audio capability (speech recognition)

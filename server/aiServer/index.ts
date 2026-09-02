@@ -2,25 +2,14 @@ import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import { prisma } from '../prisma';
 import { AiModelFactory } from './aiModelFactory';
 import { ProgressResult } from '@shared/lib/types';
-import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
-import { DocxLoader } from '@langchain/community/document_loaders/fs/docx';
-import { CSVLoader } from '@langchain/community/document_loaders/fs/csv';
-import { TextLoader } from 'langchain/document_loaders/fs/text';
-import { UnstructuredLoader } from '@langchain/community/document_loaders/fs/unstructured';
-import { BaseDocumentLoader } from '@langchain/core/document_loaders/base';
 import { FileService } from '../lib/files';
 import { Context } from '../context';
-import { CreateNotification } from '../routerTrpc/notification';
-import { NotificationType } from '@shared/lib/prismaZodType';
+// CreateNotification removed (notification router cut in simplified build)
 import { CoreMessage } from '@mastra/core';
-import { MDocument } from '@mastra/rag';
-import { embedMany } from 'ai';
-import { RebuildEmbeddingJob } from '../jobs/rebuildEmbeddingJob';
 import { userCaller } from '../routerTrpc/_app';
 
 import { getAllPathTags } from '@server/lib/helper';
 import { commentWebhookInclude, sendCommentWebhook } from '@server/lib/commentWebhook';
-import { LibSQLVector } from '@mastra/libsql';
 import { RuntimeContext } from "@mastra/core/di";
 
 export function isImage(filePath: string): boolean {
@@ -39,41 +28,17 @@ export class AiService {
   static isImage = isImage;
   static isAudio = isAudio;
 
-  static async loadFileContent(filePath: string): Promise<string> {
-    try {
-      let loader: BaseDocumentLoader;
-      switch (true) {
-        case filePath.endsWith('.pdf'):
-          loader = new PDFLoader(filePath);
-          break;
-        case filePath.endsWith('.docx') || filePath.endsWith('.doc'):
-          loader = new DocxLoader(filePath);
-          break;
-        case filePath.endsWith('.txt'):
-          loader = new TextLoader(filePath);
-          break;
-        case filePath.endsWith('.csv'):
-          console.log('load csv');
-          loader = new CSVLoader(filePath);
-          break;
-        default:
-          loader = new UnstructuredLoader(filePath);
-      }
-      const docs = await loader.load();
-      return docs.map((doc) => doc.pageContent).join('\n');
-    } catch (error) {
-      console.error('File loading error:', error);
-      throw new Error(`can not load file: ${filePath}`);
-    }
+  static async loadFileContent(_filePath: string): Promise<string> {
+    // File loading disabled in simplified build (no attachments)
     return '';
   }
 
-  static async embeddingDeleteAll(id: number, VectorStore: LibSQLVector) {
-    await VectorStore.truncateIndex({ indexName: 'blinko' });
+  static async embeddingDeleteAll(_id: number, _VectorStore?: any) {
+    // Embeddings disabled in simplified build
   }
 
-  static async embeddingDeleteAllAttachments(filePath: string, VectorStore: LibSQLVector) {
-    await VectorStore.truncateIndex({ indexName: 'blinko' });
+  static async embeddingDeleteAllAttachments(_filePath: string, _VectorStore?: any) {
+    // Embeddings disabled in simplified build
   }
 
   static async embeddingUpsert({ id, content, type, createTime, updatedAt }: { id: number; content: string; type: 'update' | 'insert'; createTime: Date; updatedAt?: Date }) {
@@ -97,15 +62,12 @@ export class AiService {
         select: { metadata: true, attachments: true }
       });
 
-      const chunks = await MDocument.fromMarkdown(content).chunk();
+      const chunks: any[] = [];
       if (type == 'update') {
         AiModelFactory.queryAndDeleteVectorById(id);
       }
 
-      const { embeddings } = await embedMany({
-        values: chunks.map((chunk) => chunk.text + 'Create At: ' + createTime.toISOString() + ' Update At: ' + updatedAt?.toISOString()),
-        model: Embeddings,
-      });
+      const embeddings: any[] = []; // embedMany removed in simplified build
 
       await VectorStore.upsert({
         indexName: 'blinko',
@@ -158,10 +120,10 @@ export class AiService {
       if (!Embeddings) {
         throw new Error("No embeddings model config")
       }
-      const doc = MDocument.fromText(content);
+      const doc: any = { text: content };
       const chunks = await doc.chunk();
 
-      const { embeddings } = await embedMany({
+      const { embeddings } = await (async () => ({ embeddings: [] as any[] }))() // embedMany disabled
         values: chunks.map((chunk) => chunk.text + 'Create At: ' + updatedAt?.toISOString() + ' Update At: ' + updatedAt?.toISOString()),
         model: Embeddings,
       });
@@ -203,17 +165,13 @@ export class AiService {
     return { ok: true };
   }
 
-  static async *rebuildEmbeddingIndex({ force = false }: { force?: boolean }): AsyncGenerator<ProgressResult & { progress?: { current: number; total: number } }, void, unknown> {
-    // This method is now a wrapper around the RebuildEmbeddingJob
-    // We'll just return a simple message directing to use the job instead
+  static async *rebuildEmbeddingIndex(_opts: { force?: boolean } = {}): AsyncGenerator<ProgressResult & { progress?: { current: number; total: number } }, void, unknown> {
+    // Embeddings disabled in simplified build - no-op
     yield {
       type: 'info' as const,
-      content: 'Rebuild embedding index task started - check task progress for details',
+      content: 'Embeddings disabled in simplified build',
       progress: { current: 0, total: 0 },
     };
-
-    // Start the job
-    await RebuildEmbeddingJob.ForceRebuild(force);
   }
 
   static getChatHistory({ conversations }: { conversations: { role: string; content: string }[] }) {
@@ -335,12 +293,7 @@ export class AiService {
         include: commentWebhookInclude,
       });
       sendCommentWebhook('comment.created', comment, {});
-      await CreateNotification({
-        accountId: note.accountId ?? 0,
-        title: 'comment-notification',
-        content: 'comment-notification',
-        type: NotificationType.COMMENT,
-      });
+      void 0;
       return comment;
     } catch (error) {
       console.log(error);
@@ -467,12 +420,7 @@ Remember: ALWAYS use tools to implement your suggestions rather than just descri
         });
         sendCommentWebhook('comment.created', comment, ctx);
 
-        await CreateNotification({
-          accountId: note.accountId ?? 0,
-          title: 'ai-post-processing-notification',
-          content: 'ai-processed-your-note',
-          type: NotificationType.COMMENT,
-        });
+        void 0;
       }
 
       if (processingMode === 'tags' || processingMode === 'both') {

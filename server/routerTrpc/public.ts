@@ -8,7 +8,7 @@ import { Metadata } from 'unfurl.js/dist/types';
 import pLimit from 'p-limit';
 import * as mm from 'music-metadata';
 import { UPLOAD_FILE_PATH } from '@shared/lib/pathConstant';
-import { SpotifyClient } from '@server/lib/spotify';
+// SpotifyClient removed (Spotify disabled in simplified build)
 import { getGlobalConfig } from './config';
 import { prisma } from '../prisma';
 import * as fs from 'fs';
@@ -19,7 +19,7 @@ import { FileService } from '@server/lib/files';
 
 const limit = pLimit(5);
 let refreshTicker = 0;
-let spotifyClient: SpotifyClient | null = null;
+// Spotify client instance removed in simplified build
 
 export const publicRouter = router({
   serverVersion: publicProcedure
@@ -185,6 +185,20 @@ export const publicRouter = router({
         { ttl: 60 * 60 * 1000 },
       );
     }),
+  musicMetadata: publicProcedure
+    .input(z.object({ filePath: z.string() }))
+    .output(
+      z.object({
+        coverUrl: z.string().optional(),
+        trackName: z.string().optional(),
+        albumName: z.string().optional(),
+        artists: z.array(z.string()).optional(),
+      }),
+    )
+    .query(async function () {
+      // Music metadata disabled in simplified build (no Spotify / no attachments)
+      return { coverUrl: '', trackName: '', albumName: '', artists: [] };
+    }),
   testWebhook: publicProcedure
     .meta({ openapi: { method: 'POST', path: '/v1/public/test-webhook', summary: 'Test webhook', tags: ['Public'] } })
     .input(
@@ -206,124 +220,6 @@ export const publicRouter = router({
         data: input.data,
       };
     }),
-  musicMetadata: publicProcedure
-    .meta({
-      openapi: { method: 'GET', path: '/v1/public/music-metadata', summary: 'Get music metadata', tags: ['Public'] },
-      headers: {
-        'Cache-Control': 'public, max-age=86400, immutable',
-        ETag: true,
-      },
-    })
-    .input(z.object({ filePath: z.string() }))
-    .output(
-      z.object({
-        coverUrl: z.string().optional(),
-        trackName: z.string().optional(),
-        albumName: z.string().optional(),
-        artists: z.array(z.string()).optional(),
-      }),
-    )
-    .query(async function ({ input }) {
-      const config = await getGlobalConfig({ useAdmin: true });
-      if (!config.spotifyConsumerKey && !config.spotifyConsumerSecret) {
-        throw new Error('Spotify client not initialized');
-      }
-      return cache.wrap(
-        input.filePath,
-        async () => {
-          let metadata: any = null;
-          if (input.filePath.includes('/api/file/')) {
-            // Security fix: Validate and resolve file path to prevent path traversal
-            try {
-              // Extract relative path from API path
-              const relativePath = input.filePath.replace('/api/file/', '');
-              
-              // Use FileService to validate and resolve the path
-              const realFilePath = FileService.validateAndResolvePath(relativePath, UPLOAD_FILE_PATH);
-              
-              const fileBuffer = await fs.promises.readFile(realFilePath);
-              metadata = await mm.parseBuffer(new Uint8Array(fileBuffer), {
-                mimeType: 'audio/mpeg',
-                path: realFilePath,
-              });
-            } catch (error: any) {
-              // Security fix: Don't leak file existence information through different error messages
-              // Return a generic error for both path traversal and file not found
-              if (error.message?.includes('path traversal') || 
-                  error.message?.includes('outside allowed directory') ||
-                  error.message?.includes('dangerous characters') ||
-                  error.code === 'ENOENT') {
-                throw new TRPCError({
-                  code: 'NOT_FOUND',
-                  message: 'File not found'
-                });
-              }
-              throw error;
-            }
-          } else if (input.filePath.includes('s3file')) {
-            try {
-              const response = await fetch(input.filePath);
-              if (!response.ok) {
-                throw new Error(`Failed to get presigned URL: ${response.statusText}`);
-              }
-
-              const presignedUrl = response.url;
-              console.log('presignedUrl', { presignedUrl });
-              const fileResponse = await fetch(presignedUrl);
-              if (!fileResponse.ok) {
-                throw new Error(`Failed to fetch file content: ${fileResponse.statusText}`);
-              }
-
-              const arrayBuffer = await fileResponse.arrayBuffer();
-              metadata = await mm.parseBuffer(new Uint8Array(arrayBuffer), {
-                mimeType: 'audio/mpeg',
-              });
-            } catch (error) {
-              console.error('Failed to get s3 file metadata:', error);
-              throw error;
-            }
-          }
-
-          const artistName = metadata?.common?.artist?.trim();
-          const trackName = metadata?.common?.title?.trim();
-
-          if (!artistName || !trackName) {
-            // console.log('Missing artist or track name');
-            return {
-              coverUrl: '',
-              trackName: '',
-              albumName: '',
-              artists: [],
-            };
-          }
-
-          if (!spotifyClient) {
-            spotifyClient = new SpotifyClient({
-              consumer: {
-                key: config.spotifyConsumerKey!,
-                secret: config.spotifyConsumerSecret!,
-              },
-            });
-          }
-
-          try {
-            const coverUrl = await spotifyClient.getCoverArt(artistName, trackName);
-            // console.log('Retrieved cover URL:', coverUrl);
-            return {
-              coverUrl,
-              trackName: trackName,
-              albumName: metadata?.common?.album || '',
-              artists: [artistName],
-            };
-          } catch (err) {
-            console.error('Failed to get music metadata:', err);
-            return {
-              coverUrl: '',
-              trackName: trackName,
-              albumName: metadata?.common?.album || '',
-              artists: [artistName],
-            };
-          }
         },
         { ttl: 60 * 60 * 1000 * 24 * 365 },
       );
