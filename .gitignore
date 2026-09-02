@@ -1,30 +1,35 @@
-# Node
-node_modules/
-dist/
-*.log
+node_modules
+.idea
 .DS_Store
+dist-ssr
+*.local
+.vscode
+out
+.next
+yarn-error.log
 .env
-.env.local
-.env.*.local
-
-# Prisma
-prisma/dev.db
-prisma/dev.db-journal
-prisma/migrations/dev/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-
-# Vite
-.vite/
-
-# TypeScript incremental build
+package-lock.json
+yarn.lock
 *.tsbuildinfo
-
-# Bun
-bun.lockb
-
-# AI Settings(本地 settings.json 可能含 API Key,不入库)
-server/data/
+.scannerwork
+.tsbuildinfo
+public/robots.txt
+public/sitemap*
+public/assets
+.blinko/*
+dump.sql
+public/sw*
+public/plugins/*
+public/workbox*.*
+seed.js
+dist
+.turbo
+keystore.properties
+!**/lute.min.js
+.blinko
+dev-dist
+.claudeconfig
+.claude/*
+.claude/settings.local.json
+target
+server/public

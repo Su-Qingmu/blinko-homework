@@ -1,18 +1,27 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
     "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "forceConsistentCasingInFileNames": true,
-    "allowSyntheticDefaultImports": true
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "typeRoots": ["./node_modules/@types", "./server/types"],
+    "paths": {
+      "@/*": ["./app/src/*"],
+      "@/routerTrpc/*": ["./server/routerTrpc/*"],
+      "@/routerExpress/*": ["./server/routerExpress/*"]
+    }
   },
-  "include": ["server/src", "app/src"],
-  "exclude": ["node_modules", "dist"]
-}
+  "include": ["app/src", "server"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+} 
