@@ -7,6 +7,7 @@ import SignIn from './pages/SignIn';
 import Notes from './pages/Notes';
 import NoteDetail from './pages/NoteDetail';
 import QuickNote from './pages/QuickNote';
+import Settings from './pages/Settings';
 
 /**
  * 全局快捷键
@@ -70,6 +71,7 @@ export default function App() {
           <Route path="/" element={<Notes />} />
           <Route path="/quick" element={<QuickNote />} />
           <Route path="/notes/:id" element={<NoteDetail />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

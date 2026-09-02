@@ -25,3 +25,6 @@ prisma/migrations/dev/
 
 # Bun
 bun.lockb
+
+# AI Settings(本地 settings.json 可能含 API Key,不入库)
+server/data/

@@ -1,28 +1,18 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc.js';
-import { getOpenAI, AI_MODEL } from '../../lib/openai.js';
-
-const SYSTEM_PROMPT_CHAT =
-  '你是 Blinko 笔记助手，一个简洁、友好、专业的 AI 伙伴。请用中文回答，控制在 200 字以内，除非用户明确要求长文。';
-
-const SYSTEM_PROMPT_COMMENT =
-  '你是一个笔记评论助手。对用户的笔记给出 1-2 句有建设性的反馈、补充或提问。不要重复笔记内容。语气温和,像朋友间的点评。';
+import { getOpenAI, getModel, testConnection } from '../../lib/openai.js';
+import { loadSettings, saveSettings, getSettingsFilePath } from '../../lib/settings.js';
 
 /**
- * AI router - 阶段5
+ * AI router - 阶段5 + 阶段6 设置
  *
- * 提供:
- * - conversations: 对话 CRUD
- * - messages: 消息历史
- * - chat: 发送一条用户消息,AI 完整回复,保存并返回
- * - commentNote: 触发 AI 自动评论笔记
- *
- * 注意: 简化版不做流式推送,等待完整响应后一次性返回。
- * 未配置 OPENAI_API_KEY 时,chat / commentNote 抛出清晰错误。
+ * 设置从 data/settings.json 实时加载,无需重启服务。
+ * 修改后下次 AI 调用立即生效。
  */
+
 export const aiRouter = router({
-  /** 当前用户的对话列表 */
+  /** ===== 对话(原 AI 模块) ===== */
   conversations: protectedProcedure.query(async ({ ctx }) => {
     return ctx.prisma.conversation.findMany({
       where: { accountId: ctx.account.id },
@@ -31,7 +21,6 @@ export const aiRouter = router({
     });
   }),
 
-  /** 新建对话(可选标题,默认 "新对话") */
   createConversation: protectedProcedure
     .input(z.object({ title: z.string().min(1).max(50).optional() }).optional())
     .mutation(async ({ ctx, input }) => {
@@ -43,7 +32,6 @@ export const aiRouter = router({
       });
     }),
 
-  /** 删除对话(级联删除消息) */
   deleteConversation: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
@@ -56,7 +44,6 @@ export const aiRouter = router({
       return { ok: true };
     }),
 
-  /** 获取某对话的全部消息(按时间正序) */
   messages: protectedProcedure
     .input(z.object({ conversationId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
@@ -71,10 +58,6 @@ export const aiRouter = router({
       });
     }),
 
-  /**
-   * 发送一条用户消息 → AI 完整回复 → 落库 → 返回 AI 消息
-   * 历史上下文: 最近 20 条消息
-   */
   chat: protectedProcedure
     .input(
       z.object({
@@ -83,14 +66,12 @@ export const aiRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // 1. 校验对话所有权
       const conv = await ctx.prisma.conversation.findFirst({
         where: { id: input.conversationId, accountId: ctx.account.id },
         select: { id: true },
       });
       if (!conv) throw new TRPCError({ code: 'NOT_FOUND', message: '对话不存在' });
 
-      // 2. 保存用户消息
       await ctx.prisma.message.create({
         data: {
           role: 'user',
@@ -99,7 +80,6 @@ export const aiRouter = router({
         },
       });
 
-      // 3. 加载历史(最近 20 条)
       const history = await ctx.prisma.message.findMany({
         where: { conversationId: input.conversationId },
         orderBy: { createdAt: 'desc' },
@@ -107,15 +87,19 @@ export const aiRouter = router({
       });
       history.reverse();
 
-      // 4. 调用 OpenAI
+      const settings = loadSettings();
+
       let aiContent: string;
       try {
         const openai = getOpenAI();
         const completion = await openai.chat.completions.create({
-          model: AI_MODEL,
+          model: getModel(),
           messages: [
-            { role: 'system', content: SYSTEM_PROMPT_CHAT },
-            ...history.map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content })),
+            { role: 'system', content: settings.prompts.chat },
+            ...history.map((m) => ({
+              role: m.role as 'user' | 'assistant' | 'system',
+              content: m.content,
+            })),
           ],
         });
         aiContent = completion.choices[0]?.message?.content?.trim() || '(空回复)';
@@ -127,7 +111,6 @@ export const aiRouter = router({
         });
       }
 
-      // 5. 保存 AI 回复
       const assistantMsg = await ctx.prisma.message.create({
         data: {
           role: 'assistant',
@@ -136,7 +119,6 @@ export const aiRouter = router({
         },
       });
 
-      // 6. 更新对话 updatedAt(让列表按最近活跃排序)
       await ctx.prisma.conversation.update({
         where: { id: input.conversationId },
         data: { updatedAt: new Date() },
@@ -145,13 +127,6 @@ export const aiRouter = router({
       return assistantMsg;
     }),
 
-  /**
-   * AI 自动评论笔记:
-   * - 读取笔记内容
-   * - 调用 OpenAI 生成 1-2 句点评
-   * - 作为 AI 评论(isAI=true, accountId=null)写入
-   * - 返回新评论
-   */
   commentNote: protectedProcedure
     .input(z.object({ noteId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
@@ -160,13 +135,15 @@ export const aiRouter = router({
       });
       if (!note) throw new TRPCError({ code: 'NOT_FOUND', message: '笔记不存在' });
 
+      const settings = loadSettings();
+
       let aiText: string;
       try {
         const openai = getOpenAI();
         const completion = await openai.chat.completions.create({
-          model: AI_MODEL,
+          model: getModel(),
           messages: [
-            { role: 'system', content: SYSTEM_PROMPT_COMMENT },
+            { role: 'system', content: settings.prompts.comment },
             { role: 'user', content: note.content.slice(0, 4000) },
           ],
         });
@@ -190,4 +167,82 @@ export const aiRouter = router({
         },
       });
     }),
+
+  /** ===== AI 设置(新增) ===== */
+
+  /** 读取当前 AI 设置(apiKey 仅返回前 4 位 + 长度) */
+  getSettings: protectedProcedure.query(() => {
+    const s = loadSettings();
+    return {
+      openai: {
+        baseURL: s.openai.baseURL,
+        defaultModel: s.openai.defaultModel,
+        apiKeyMasked: s.openai.apiKey
+          ? `${s.openai.apiKey.slice(0, 4)}…${s.openai.apiKey.slice(-4)} (长度 ${s.openai.apiKey.length})`
+          : '',
+        apiKeySet: !!s.openai.apiKey,
+      },
+      prompts: s.prompts,
+      settingsFilePath: getSettingsFilePath(),
+    };
+  }),
+
+  /** 更新 AI 设置(apiKey 留空表示不变) */
+  updateSettings: protectedProcedure
+    .input(
+      z.object({
+        openai: z
+          .object({
+            apiKey: z.string().optional(),
+            baseURL: z.string().url().or(z.literal('')).optional(),
+            defaultModel: z.string().min(1).max(100).optional(),
+          })
+          .optional(),
+        prompts: z
+          .object({
+            chat: z.string().min(1).max(4000).optional(),
+            comment: z.string().min(1).max(4000).optional(),
+          })
+          .optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const current = loadSettings();
+      // apiKey: 留空 → 不变;"null" 字符串 → 清空;其他 → 更新
+      const openaiPatch = input.openai
+        ? {
+            ...input.openai,
+            ...(input.openai.apiKey !== undefined && input.openai.apiKey === ''
+              ? {} // 留空不变
+              : {}),
+          }
+        : undefined;
+
+      // 处理 apiKey:实际逻辑
+      const newOpenai = {
+        apiKey: current.openai.apiKey,
+        baseURL: input.openai?.baseURL || current.openai.baseURL,
+        defaultModel: input.openai?.defaultModel || current.openai.defaultModel,
+      };
+      if (input.openai?.apiKey !== undefined && input.openai.apiKey !== '') {
+        newOpenai.apiKey = input.openai.apiKey;
+      }
+      // 显式清空
+      if (input.openai?.apiKey === '__CLEAR__') {
+        newOpenai.apiKey = '';
+      }
+
+      const newPrompts = {
+        chat: input.prompts?.chat ?? current.prompts.chat,
+        comment: input.prompts?.comment ?? current.prompts.comment,
+      };
+
+      saveSettings({ openai: newOpenai, prompts: newPrompts });
+      return { ok: true };
+    }),
+
+  /** 测试当前 OpenAI 连接 */
+  testConnection: protectedProcedure.mutation(async () => {
+    return testConnection();
+  }),
 });

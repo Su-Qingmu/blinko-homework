@@ -10,6 +10,10 @@ const NAV: readonly NavItem[] = [
   { to: '/quick', label: '闪念速记', icon: 'basil:lightning-outline', shortcut: 'Ctrl+Shift+N' },
 ];
 
+const NAV_BOTTOM: readonly NavItem[] = [
+  { to: '/settings', label: 'AI 设置', icon: 'hugeicons:settings-01' },
+];
+
 /**
  * 主框架 - 还原 Blinko 侧边栏风格
  *
@@ -100,6 +104,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </ul>
+
+          {/* 底部导航(设置) */}
+          <div className="mt-3 pt-3 border-t border-sidebar-border space-y-1">
+            {NAV_BOTTOM.map((item) => {
+              const active = location.pathname.startsWith(item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={clsx(
+                    'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-semibold transition',
+                    active
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                  )}
+                >
+                  <Icon icon={item.icon} width={20} height={20} />
+                  <span className="flex-1 truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
         </nav>
 
         {/* 底部用户区 */}
