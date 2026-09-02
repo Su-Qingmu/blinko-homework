@@ -1,201 +1,246 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { trpc } from '../lib/trpc';
+import { PageHeader } from '../components/AppShell';
 import { MarkdownView } from '../components/MarkdownView';
-import { TagSelector } from '../components/TagSelector';
+import { NoteEditor } from '../components/NoteEditor';
 import { CommentList } from '../components/CommentList';
+import { TagSelector } from '../components/TagSelector';
+import { Icon } from '../components/Icon';
 
-/**
- * 笔记详情页 /notes/:id
- * - 默认:查看模式(markdown 渲染 + 标签展示)
- * - 点编辑:切换到编辑模式(同 NoteEditor 表单)
- * - 点删除:确认后返回首页
- */
 export default function NoteDetail() {
   const { id } = useParams<{ id: string }>();
   const noteId = Number(id);
-  const navigate = useNavigate();
   const utils = trpc.useUtils();
+  const navigate = useNavigate();
+  const note = trpc.note.get.useQuery({ id: noteId });
+  const [editing, setEditing] = useState(false);
+  const [tagDraft, setTagDraft] = useState<string[] | null>(null);
 
-  const me = trpc.user.me.useQuery();
-  const note = trpc.note.get.useQuery(
-    { id: noteId },
-    { enabled: Number.isFinite(noteId) && noteId > 0 },
-  );
-  const del = trpc.note.delete.useMutation({
+  const updateNote = trpc.note.update.useMutation({
+    onSuccess: () => {
+      utils.note.get.invalidate({ id: noteId });
+      utils.note.list.invalidate();
+      setEditing(false);
+      setTagDraft(null);
+    },
+  });
+  const deleteNote = trpc.note.delete.useMutation({
     onSuccess: () => {
       utils.note.list.invalidate();
       navigate('/', { replace: true });
     },
   });
-  const update = trpc.note.update.useMutation({
-    onSuccess: () => {
-      utils.note.get.invalidate({ id: noteId });
-      utils.note.list.invalidate();
-      setEditing(false);
-    },
-  });
-
-  const [editing, setEditing] = useState(false);
-  const [content, setContent] = useState('');
-  const [tagNames, setTagNames] = useState<string[]>([]);
-
-  // 进入编辑模式时,把当前内容灌入表单
-  useEffect(() => {
-    if (editing && note.data) {
-      setContent(note.data.content);
-      setTagNames(note.data.tags.map((t) => t.name));
-    }
-  }, [editing, note.data]);
-
-  if (!Number.isFinite(noteId) || noteId <= 0) {
-    return <ErrorPage msg="无效的笔记 id" />;
-  }
 
   if (note.isLoading) {
-    return <CenterMsg>加载中…</CenterMsg>;
-  }
-
-  if (note.error) {
-    return <ErrorPage msg={note.error.message} />;
+    return (
+      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground gap-2">
+        <Icon icon="hugeicons:loading-03" width={16} height={16} className="animate-spin" />
+        加载中…
+      </div>
+    );
   }
 
   if (!note.data) {
-    return <ErrorPage msg="笔记不存在或已被删除" />;
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+        <div className="w-16 h-16 rounded-2xl bg-muted text-muted-foreground mx-auto flex items-center justify-center mb-3">
+          <Icon icon="hugeicons:note-remove" width={28} height={28} />
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">笔记不存在或已删除</p>
+        <Link to="/" className="btn-primary inline-flex items-center gap-1.5">
+          <Icon icon="hugeicons:arrow-left-01" width={16} height={16} />
+          返回列表
+        </Link>
+      </div>
+    );
   }
 
   const n = note.data;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <Link to="/" className="text-sm text-indigo-600 hover:underline">
-            ← 返回列表
+    <div className="flex-1 min-h-0 flex flex-col">
+      <PageHeader
+        breadcrumb={
+          <Link to="/" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+            <Icon icon="hugeicons:arrow-left-01" width={14} height={14} />
+            我的笔记
           </Link>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500 hidden sm:inline">
-              {me.data?.nickname || me.data?.username}
+        }
+        title={
+          editing ? (
+            '编辑笔记'
+          ) : (
+            <span className="inline-flex items-center gap-2">
+              <Icon
+                icon={n.type === 1 ? 'basil:lightning-solid' : 'hugeicons:note-01'}
+                width={18}
+                height={18}
+                className={n.type === 1 ? 'text-flash' : 'text-primary'}
+              />
+              {n.type === 1 ? '闪念' : '笔记'}
+              {n.archived && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-normal inline-flex items-center gap-1">
+                  <Icon icon="hugeicons:archive" width={10} height={10} /> 归档
+                </span>
+              )}
+              {n.top && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-normal inline-flex items-center gap-1">
+                  <Icon icon="hugeicons:pin" width={10} height={10} /> 置顶
+                </span>
+              )}
             </span>
-            {!editing ? (
-              <>
-                <button
-                  className="btn-ghost"
-                  onClick={() => setEditing(true)}
-                  disabled={update.isPending}
-                >
-                  ✏️ 编辑
-                </button>
-                <button
-                  className="btn-ghost text-red-600 hover:bg-red-50"
-                  onClick={() => {
-                    if (confirm('确认删除这条笔记?')) del.mutate({ id: n.id });
-                  }}
-                  disabled={del.isPending}
-                >
-                  🗑️ 删除
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  className="btn-ghost"
-                  onClick={() => setEditing(false)}
-                  disabled={update.isPending}
-                >
-                  取消
-                </button>
-                <button
-                  className="btn-primary"
-                  onClick={() =>
-                    update.mutate({
-                      id: n.id,
-                      content: content.trim() || n.content,
-                      tagNames,
-                    })
-                  }
-                  disabled={update.isPending || !content.trim()}
-                >
-                  {update.isPending ? '保存中…' : '保存'}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+          )
+        }
+        subtitle={new Date(n.createdAt).toLocaleString('zh-CN')}
+        actions={
+          editing ? (
+            <button type="button" className="btn-ghost" onClick={() => { setEditing(false); setTagDraft(null); }}>
+              取消
+            </button>
+          ) : (
+            <>
+              <button type="button" className="btn-outline flex items-center gap-1.5" onClick={() => setEditing(true)}>
+                <Icon icon="hugeicons:pencil-edit-01" width={14} height={14} />
+                编辑
+              </button>
+              <button
+                type="button"
+                className="btn-outline flex items-center gap-1.5"
+                onClick={() => updateNote.mutate({ id: n.id, top: !n.top })}
+              >
+                <Icon icon={n.top ? 'hugeicons:pin-tack-02' : 'hugeicons:pin'} width={14} height={14} />
+                {n.top ? '取消置顶' : '置顶'}
+              </button>
+              <button
+                type="button"
+                className="btn-outline text-destructive hover:bg-destructive/10 flex items-center gap-1.5"
+                onClick={() => {
+                  if (confirm('确定删除该笔记?')) deleteNote.mutate({ id: n.id });
+                }}
+              >
+                <Icon icon="hugeicons:delete-02" width={14} height={14} />
+                删除
+              </button>
+            </>
+          )
+        }
+      />
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-          <span>{n.type === 1 ? '⚡ 闪念' : '📝 笔记'}</span>
-          {n.top && <span className="text-amber-500">📌 置顶</span>}
-          <span>·</span>
-          <span>更新于 {new Date(n.updatedAt).toLocaleString('zh-CN')}</span>
-          <span>·</span>
-          <span>创建于 {new Date(n.createdAt).toLocaleString('zh-CN')}</span>
-        </div>
-
+      <div className="flex-1 overflow-y-auto px-6 py-6 max-w-4xl w-full mx-auto space-y-6">
         {editing ? (
-          <div className="card p-4 space-y-3">
-            <textarea
-              autoFocus
-              className="block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono"
-              rows={n.type === 1 ? 4 : 12}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              maxLength={20_000}
+          <>
+            <NoteEditor
+              defaultContent={n.content}
+              defaultTagNames={tagDraft ?? n.tags.map((t) => t.name)}
+              defaultType={n.type === 1 ? 'quick' : 'note'}
             />
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">标签</label>
-              <TagSelector value={tagNames} onChange={setTagNames} />
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-ghost" onClick={() => { setEditing(false); setTagDraft(null); }}>
+                取消
+              </button>
+              <button
+                type="button"
+                className="btn-primary flex items-center gap-1.5"
+                onClick={() => {
+                  const ta = document.querySelector('textarea') as HTMLTextAreaElement | null;
+                  updateNote.mutate({
+                    id: n.id,
+                    content: ta?.value ?? n.content,
+                    tagNames: tagDraft ?? n.tags.map((t) => t.name),
+                  });
+                }}
+                disabled={updateNote.isPending}
+              >
+                {updateNote.isPending ? (
+                  <>
+                    <Icon icon="hugeicons:loading-03" width={14} height={14} className="animate-spin" />
+                    保存中…
+                  </>
+                ) : (
+                  <>
+                    <Icon icon="hugeicons:tick-02" width={14} height={14} />
+                    保存
+                  </>
+                )}
+              </button>
             </div>
-            {update.error && (
-              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
-                {update.error.message}
-              </div>
-            )}
-          </div>
+          </>
         ) : (
           <>
             <article className="card p-6">
               <MarkdownView content={n.content} />
             </article>
-            {n.tags.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {n.tags.map((t) => (
-                  <Link
-                    key={t.id}
-                    to={`/?tagId=${t.id}`}
-                    className="text-sm bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full hover:bg-indigo-100 transition"
+
+            {/* 标签 */}
+            {tagDraft !== null ? (
+              <div className="card p-4 space-y-3">
+                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Icon icon="mingcute:hashtag-line" width={14} height={14} />
+                  编辑标签
+                </div>
+                <TagSelector value={tagDraft} onChange={setTagDraft} />
+                <div className="flex justify-end gap-2">
+                  <button type="button" className="btn-ghost" onClick={() => setTagDraft(null)}>
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary flex items-center gap-1.5"
+                    onClick={() => updateNote.mutate({ id: n.id, tagNames: tagDraft })}
                   >
-                    #{t.name}
+                    <Icon icon="hugeicons:tick-02" width={14} height={14} />
+                    保存标签
+                  </button>
+                </div>
+              </div>
+            ) : n.tags.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Icon icon="mingcute:hashtag-line" width={14} height={14} /> 标签:
+                </span>
+                {n.tags.map((t) => (
+                  <Link key={t.id} to={`/?tagId=${t.id}`} className="chip">
+                    <Icon icon="mingcute:hashtag-line" width={10} height={10} />
+                    {t.name}
                   </Link>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setTagDraft(n.tags.map((t) => t.name))}
+                  className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                >
+                  <Icon icon="hugeicons:pencil-edit-01" width={12} height={12} />
+                  编辑
+                </button>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setTagDraft([])}
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                <Icon icon="hugeicons:add-01" width={12} height={12} />
+                添加标签
+              </button>
             )}
 
             {/* 评论区 */}
-            <div className="mt-6">
+            <section>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Icon icon="hugeicons:message-01" width={16} height={16} />
+                评论
+                {n._count.comments > 0 && (
+                  <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-normal">
+                    {n._count.comments}
+                  </span>
+                )}
+              </h3>
               <CommentList noteId={n.id} />
-            </div>
+            </section>
           </>
         )}
-      </main>
-    </div>
-  );
-}
-
-function CenterMsg({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-screen flex items-center justify-center text-gray-400">{children}</div>;
-}
-
-function ErrorPage({ msg }: { msg: string }) {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
-      <div className="text-5xl mb-3">😢</div>
-      <p className="text-gray-600 mb-4">{msg}</p>
-      <Link to="/" className="btn-primary">
-        返回首页
-      </Link>
+      </div>
     </div>
   );
 }

@@ -1,17 +1,19 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, Outlet } from 'react-router-dom';
 import { trpc } from './lib/trpc';
+import { AppShell } from './components/AppShell';
+import { AIChatBubble } from './components/AIChatBubble';
 import SignIn from './pages/SignIn';
 import Notes from './pages/Notes';
 import NoteDetail from './pages/NoteDetail';
 import QuickNote from './pages/QuickNote';
-import AIChat from './pages/AIChat';
 
 /**
  * 全局快捷键
  * - Ctrl/Cmd + Shift + N → 闪念速记
- * - Ctrl/Cmd + Shift + I → AI 助手
- * 仅在已登录状态下生效
+ * - Ctrl/Cmd + Shift + I → AI 助手(打开抽屉)
+ *
+ * AI 抽屉状态由 AIChatBubble 内部管理,这里只发自定义事件通知
  */
 function GlobalShortcuts({ enabled }: { enabled: boolean }) {
   const navigate = useNavigate();
@@ -24,13 +26,23 @@ function GlobalShortcuts({ enabled }: { enabled: boolean }) {
         navigate('/quick');
       } else if (e.key === 'I' || e.key === 'i') {
         e.preventDefault();
-        navigate('/ai');
+        window.dispatchEvent(new CustomEvent('toggle-ai-chat'));
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [enabled, navigate]);
   return null;
+}
+
+/** 已登录路由的统一外壳:sidebar + AI 悬浮气泡 */
+function AuthedShell() {
+  return (
+    <AppShell>
+      <Outlet />
+      <AIChatBubble />
+    </AppShell>
+  );
 }
 
 export default function App() {
@@ -40,7 +52,7 @@ export default function App() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen text-gray-400 text-sm">
+      <div className="flex items-center justify-center h-screen bg-background text-muted-foreground text-sm">
         加载中…
       </div>
     );
@@ -54,23 +66,12 @@ export default function App() {
           path="/signin"
           element={isAuthed ? <Navigate to="/" replace /> : <SignIn />}
         />
-        <Route
-          path="/quick"
-          element={isAuthed ? <QuickNote /> : <Navigate to="/signin" replace />}
-        />
-        <Route
-          path="/ai"
-          element={isAuthed ? <AIChat /> : <Navigate to="/signin" replace />}
-        />
-        <Route
-          path="/notes/:id"
-          element={isAuthed ? <NoteDetail /> : <Navigate to="/signin" replace />}
-        />
-        <Route
-          path="/"
-          element={isAuthed ? <Notes /> : <Navigate to="/signin" replace />}
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route element={isAuthed ? <AuthedShell /> : <Navigate to="/signin" replace />}>
+          <Route path="/" element={<Notes />} />
+          <Route path="/quick" element={<QuickNote />} />
+          <Route path="/notes/:id" element={<NoteDetail />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );

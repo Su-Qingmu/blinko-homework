@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { trpc } from '../lib/trpc';
+import { PageHeader } from '../components/AppShell';
+import { Icon } from '../components/Icon';
 
 /**
- * 闪念快速输入 /quick
- *
- * 设计目标:1 秒内捕住灵感
- * - 全屏 textarea
+ * 闪念快速输入
+ * - 全屏 amber 背景(flash token)
  * - 自动聚焦
- * - Esc 取消,Ctrl/Cmd+Enter 提交
- * - 提交后自动清空,继续输入下一条
- * - 点"完成"返回首页
+ * - Ctrl/Cmd + Enter 提交
+ * - Esc 退出
  */
 export default function QuickNote() {
   const navigate = useNavigate();
@@ -42,33 +41,49 @@ export default function QuickNote() {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       submit();
+    } else if (e.key === 'Escape') {
+      navigate('/');
     }
   };
 
   return (
-    <div className="min-h-screen bg-amber-50 flex flex-col">
-      <header className="border-b border-amber-200 bg-white/60 backdrop-blur">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-sm text-amber-700 hover:underline"
-          >
-            ← 返回
-          </button>
-          <div className="text-sm text-amber-700">
-            ⚡ 闪念速记
-            <span className="ml-2 text-xs text-amber-600">
-              Ctrl/Cmd + Enter 提交 · Esc 取消
-            </span>
-          </div>
-        </div>
-      </header>
+    <div className="flex-1 min-h-0 flex flex-col bg-flash-foreground/30">
+      <PageHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <Icon icon="basil:lightning-solid" width={20} height={20} className="text-flash" />
+            <span className="text-flash">闪念速记</span>
+          </span>
+        }
+        subtitle="Ctrl/Cmd + Enter 提交 · Esc 退出"
+        breadcrumb={
+          <Link to="/" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
+            <Icon icon="hugeicons:arrow-left-01" width={14} height={14} />
+            我的笔记
+          </Link>
+        }
+        actions={
+          <>
+            <button type="button" className="btn-ghost" onClick={() => navigate('/')}>
+              返回
+            </button>
+            <button
+              type="button"
+              className="btn-primary flex items-center gap-1.5"
+              onClick={submit}
+              disabled={create.isPending || !content.trim()}
+            >
+              <Icon icon="hugeicons:tick-02" width={16} height={16} />
+              {create.isPending ? '保存中…' : '保存闪念'}
+            </button>
+          </>
+        }
+      />
 
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col">
+      <div className="flex-1 flex flex-col px-6 py-6 max-w-3xl w-full mx-auto">
         <textarea
           ref={taRef}
-          className="flex-1 block w-full bg-transparent border-0 outline-none resize-none text-lg text-gray-800 placeholder-amber-400 focus:ring-0"
+          className="flex-1 block w-full bg-transparent border-0 outline-none resize-none text-lg text-foreground placeholder:text-muted-foreground focus:ring-0"
           placeholder="一闪而过的灵感..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -76,37 +91,29 @@ export default function QuickNote() {
           maxLength={20_000}
         />
 
-        <div className="flex items-center justify-between text-sm">
-          <div className="text-gray-400">
-            {lastSavedId
-              ? `✅ 已保存 (id=${lastSavedId}),继续写下一条`
-              : `${content.length} / 20000`}
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => navigate('/')}
-            >
-              完成
-            </button>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={submit}
-              disabled={create.isPending || !content.trim()}
-            >
-              {create.isPending ? '保存中…' : '保存闪念'}
-            </button>
-          </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground py-2 border-t border-border">
+          <span className="flex items-center gap-1.5">
+            {lastSavedId ? (
+              <>
+                <Icon icon="hugeicons:tick-double-01" width={14} height={14} className="text-green-600" />
+                已保存 (id={lastSavedId}),继续写下一条
+              </>
+            ) : (
+              <>
+                <Icon icon="hugeicons:pencil-edit-01" width={14} height={14} />
+                {content.length} / 20000
+              </>
+            )}
+          </span>
         </div>
 
         {create.error && (
-          <div className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
-            {create.error.message}
+          <div className="mt-3 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded px-3 py-2 flex items-start gap-2">
+            <Icon icon="hugeicons:alert-circle" width={16} height={16} className="shrink-0 mt-0.5" />
+            <span className="flex-1">{create.error.message}</span>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }
