@@ -2,29 +2,18 @@ import { observer } from 'mobx-react-lite';
 import { BasicSetting } from '@/components/BlinkoSettings/BasicSetting';
 import AiSetting from '@/components/BlinkoSettings/AiSetting/AiSetting';
 import { PerferSetting } from '@/components/BlinkoSettings/PerferSetting';
-import { TaskSetting } from '@/components/BlinkoSettings/TaskSetting';
-import { ImportSetting } from '@/components/BlinkoSettings/ImportSetting';
 import { ScrollArea } from '@/components/Common/ScrollArea';
 import { UserStore } from '@/store/user';
 import { RootStore } from '@/store';
 import { UserSetting } from '@/components/BlinkoSettings/UserSetting';
 import { AboutSetting } from '@/components/BlinkoSettings/AboutSetting';
-import { StorageSetting } from '@/components/BlinkoSettings/StorageSetting';
-import { ExportSetting } from '@/components/BlinkoSettings/ExportSetting';
-import { MusicSetting } from '@/components/BlinkoSettings/MusicSetting';
-import { SSOSetting } from '@/components/BlinkoSettings/SSOSetting';
-import { HttpProxySetting } from '@/components/BlinkoSettings/HttpProxySetting';
 import { useTranslation } from 'react-i18next';
 import { JSX } from 'react';
 import { ScrollableTabs, TabItem } from '@/components/Common/ScrollableTabs';
 import { useState, useEffect } from 'react';
 import { BlinkoStore } from '@/store/blinkoStore';
-import { PluginSetting } from '@/components/BlinkoSettings/PluginSetting';
-import { ImportAIDialog } from '@/components/BlinkoSettings/ImportAIDialog';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Icon } from '@/components/Common/Iconify/icons';
-import { HotkeySetting } from '@/components/BlinkoSettings/HotkeySetting';
-import { isDesktop } from '@/lib/tauriHelper';
 
 type SettingItem = {
   key: string;
@@ -34,6 +23,10 @@ type SettingItem = {
   requireAdmin: boolean;
   keywords?: string[];
 };
+
+// 精简版设置:只保留 5 项
+// 删除: hotkey(Tauri 桌面端依赖)、httpproxy(代理)、task(定时任务)、storage(数据库配置)、
+//       music(音乐)、import(数据导入)、sso(单点登录)、export(数据导出)、plugin(插件)
 export const allSettings: SettingItem[] = [
   {
     key: 'basic',
@@ -52,14 +45,6 @@ export const allSettings: SettingItem[] = [
     keywords: ['preference', 'theme', 'language', '偏好设置', '主题', '语言'],
   },
   {
-    key: 'hotkey',
-    title: ('hotkeys'),
-    icon: 'material-symbols:keyboard',
-    component: <HotkeySetting />,
-    requireAdmin: false,
-    keywords: ['hotkey', 'shortcut', 'keyboard', 'desktop', '快捷键', '热键', '桌面'],
-  },
-  {
     key: 'user',
     title: ('user-list'),
     icon: 'tabler:users',
@@ -74,70 +59,6 @@ export const allSettings: SettingItem[] = [
     component: <AiSetting />,
     requireAdmin: true,
     keywords: ['ai', 'artificial intelligence', '人工智能'],
-  },
-  {
-    key: 'httpproxy',
-    title: ('http-proxy'),
-    icon: 'tabler:cloud-network',
-    component: <HttpProxySetting />,
-    requireAdmin: true,
-    keywords: ['proxy', 'http', 'connection', '代理', 'HTTP代理'],
-  },
-  {
-    key: 'task',
-    title: ('schedule-task'),
-    icon: 'tabler:list-check',
-    component: <TaskSetting />,
-    requireAdmin: true,
-    keywords: ['task', 'schedule', '任务', '定时任务'],
-  },
-  {
-    key: 'storage',
-    title: ('storage'),
-    icon: 'tabler:database',
-    component: <StorageSetting />,
-    requireAdmin: true,
-    keywords: ['storage', 'database', '存储', '数据库'],
-  },
-  {
-    key: 'music',
-    title: ('music-settings'),
-    icon: 'tabler:music',
-    component: <MusicSetting />,
-    requireAdmin: true,
-    keywords: ['music', '音乐设置'],
-  },
-  {
-    key: 'import',
-    title: ('import'),
-    icon: 'tabler:file-import',
-    component: <ImportSetting />,
-    requireAdmin: true,
-    keywords: ['import', 'data', '导入', '数据导入'],
-  },
-  {
-    key: 'sso',
-    title: ('sso-settings'),
-    icon: 'tabler:key',
-    component: <SSOSetting />,
-    requireAdmin: true,
-    keywords: ['sso', 'single sign on', '单点登录'],
-  },
-  {
-    key: 'export',
-    title: ('export'),
-    icon: 'tabler:file-export',
-    component: <ExportSetting />,
-    requireAdmin: false,
-    keywords: ['export', 'data', '导出', '数据导出'],
-  },
-  {
-    key: 'plugin',
-    title: ('plugin-settings'),
-    icon: 'hugeicons:plug-socket',
-    component: <PluginSetting />,
-    requireAdmin: true,
-    keywords: ['plugin', 'plugins', '插件', '插件设置'],
   },
   {
     key: 'about',
@@ -157,11 +78,6 @@ const Page = observer(() => {
 
   const getVisibleSettings = () => {
     let settings = allSettings.filter((setting) => !setting.requireAdmin || user.isSuperAdmin);
-
-    // Hide hotkey settings on mobile platforms
-    settings = settings.filter((setting) =>
-      (setting.key !== 'hotkey' || isDesktop())
-    );
 
     if (blinkoStore.searchText) {
       const lowerSearchText = blinkoStore.searchText.toLowerCase();
@@ -194,8 +110,6 @@ const Page = observer(() => {
 
   return (
     <div className="h-full flex flex-col">
-      <ImportAIDialog onSelectTab={setSelected} />
-
       {isMobile ? (
         <div className="w-full">
           <div className="sticky top-0 z-10 w-full">

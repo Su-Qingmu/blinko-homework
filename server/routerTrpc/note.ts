@@ -42,7 +42,7 @@ export const noteRouter = router({
         isUseAiQuery: z.boolean().default(false).optional(),
         startDate: z.union([z.date(), z.null(), z.string()]).default(null).optional(),
         endDate: z.union([z.date(), z.null(), z.string()]).default(null).optional(),
-        hasTodo: z.boolean().default(false).optional(),
+        // hasTodo: z.boolean().default(false).optional(), // todo 功能已下线
       }),
     )
     .output(
@@ -104,7 +104,7 @@ export const noteRouter = router({
       ),
     )
     .mutation(async function ({ input, ctx }) {
-      const { tagId, type, isArchived, isRecycle, searchText, page, size, orderBy, withFile, withoutTag, withLink, isUseAiQuery, startDate, endDate, isShare, hasTodo } = input;
+      const { tagId, type, isArchived, isRecycle, searchText, page, size, orderBy, withFile, withoutTag, withLink, isUseAiQuery, startDate, endDate, isShare } = input;
       if (isUseAiQuery && searchText?.trim() != '') {
         const cleanedQuery = searchText?.replace(/@/g, '').trim();
         if (cleanedQuery && cleanedQuery.length > 0) {
@@ -182,14 +182,15 @@ export const noteRouter = router({
       if (withLink) {
         where.OR = [{ content: { contains: 'http://' } }, { content: { contains: 'https://' } }];
       }
-      if (hasTodo) {
-        where.OR = [
-          { content: { contains: '- [ ]' } },
-          { content: { contains: '- [x]' } },
-          { content: { contains: '* [ ]' } },
-          { content: { contains: '* [x]' } },
-        ];
-      }
+      // todo 功能在精简版下线(侧边栏/页面均已删除)
+      // if (hasTodo) {
+      //   where.OR = [
+      //     { content: { contains: '- [ ]' } },
+      //     { content: { contains: '- [x]' } },
+      //     { content: { contains: '* [ ]' } },
+      //     { content: { contains: '* [x]' } },
+      //   ];
+      // }
       const config = await getGlobalConfig({ ctx });
       let timeOrderBy = config?.isOrderByCreateTime ? { createdAt: orderBy } : { updatedAt: orderBy };
 
