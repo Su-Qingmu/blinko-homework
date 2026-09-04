@@ -12,6 +12,8 @@ export class BaseStore implements Store {
     makeAutoObservable(this);
   }
   routerList = [
+    // 精简版侧边栏:只保留 6 项(闪念/笔记/AI/统计/回收站/设置)
+    // 删除: todo(待办)、resources(资源)、archived(归档)、plugin(插件)
     {
       title: 'blinko',
       href: '/',
@@ -25,10 +27,9 @@ export class BaseStore implements Store {
       icon: 'hugeicons:note',
     },
     {
-      title: 'todo',
-      shallow: true,
-      href: '/?path=todo',
-      icon: 'solar:bill-check-linear',
+      title: 'ai',
+      href: '/ai',
+      icon: 'hugeicons:sparkles',
     },
     {
       title: 'analytics',
@@ -37,35 +38,14 @@ export class BaseStore implements Store {
       icon: 'hugeicons:analytics-01',
     },
     {
-      title: 'resources',
-      href: '/resources',
-      icon: 'solar:database-linear',
-      hiddenMobile: true,
-    },
-    {
-      title: 'archived',
-      href: '/?path=archived',
-      icon: 'solar:box-broken',
-      hiddenMobile: true,
-    },
-    {
       title: 'trash',
       href: '/?path=trash',
       hiddenMobile: true,
-      hiddenSidebar: true,
       icon: 'hugeicons:delete-02',
-    },
-    {
-      title: 'plugin',
-      href: '/plugin',
-      hiddenSidebar: true,
-      hiddenMobile: true,
-      icon: 'hugeicons:plug-socket',
     },
     {
       title: 'settings',
       href: '/settings',
-      hiddenSidebar: true,
       hiddenMobile: true,
       icon: 'hugeicons:settings-01',
     },
