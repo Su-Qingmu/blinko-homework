@@ -52,7 +52,7 @@ model attachments {
   updatedAt     DateTime @updatedAt
   perfixPath    String?  @default("") // folder1,folder2,folder3
   depth         Int?
-  metadata      Json?
+  metadata      String?
 
   note    notes?    @relation(fields: [noteId], references: [id])
   account accounts? @relation(fields: [accountId], references: [id])
@@ -61,7 +61,7 @@ model attachments {
 model config {
   id     Int       @id @default(autoincrement())
   key    String    @default("")
-  config Json?
+  config String?
   userId Int?
   user   accounts? @relation(fields: [userId], references: [id])
 }
@@ -80,7 +80,7 @@ model notes {
   shareExpiryDate   DateTime?
   shareMaxView      Int?            @default(0)
   shareViewCount    Int?            @default(0)
-  metadata          Json?
+  metadata          String?
   accountId         Int?
   sortOrder         Int             @default(0)
   createdAt         DateTime        @default(now())
@@ -127,7 +127,6 @@ model tag {
 }
 
 model tagsToNote {
-  id     Int @default(autoincrement())
   noteId Int @default(0)
   tagId  Int @default(0)
 
@@ -169,7 +168,7 @@ model notifications {
   type      String // follow, comment, mention 等
   title     String
   content   String
-  metadata  Json?
+  metadata  String?
   isRead    Boolean  @default(false)
   accountId Int
   createdAt DateTime @default(now())
@@ -181,7 +180,7 @@ model notifications {
 model cache {
   id        Int      @id @default(autoincrement())
   key       String   @unique
-  value     Json
+  value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -209,7 +208,7 @@ model message {
   conversationId Int
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  metadata       Json?
+  metadata       String?
 
   conversation conversation @relation(fields: [conversationId], references: [id])
 
@@ -220,7 +219,7 @@ model noteHistory {
   id        Int      @id @default(autoincrement())
   noteId    Int
   content   String
-  metadata  Json?
+  metadata  String?
   version   Int
   accountId Int?
   createdAt DateTime @default(now())
@@ -264,7 +263,7 @@ model aiProviders {
   provider  String
   baseURL   String?
   apiKey    String?
-  config    Json?
+  config    String?
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -277,8 +276,8 @@ model aiModels {
   providerId    Int
   title         String
   modelKey      String
-  capabilities  Json
-  config        Json?
+  capabilities  String
+  config        String?
   sortOrder     Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

@@ -145,14 +145,16 @@ export const getNextAuthSecret = async () => {
       where: { key: configKey }
     });
     if (savedSecret) {
-      // @ts-ignore
-      secret = savedSecret.config.value as string;
+      // SQLite: config 字段是 String(JSON 序列化)
+      const parsed = savedSecret.config ? JSON.parse(savedSecret.config) : null;
+      secret = parsed?.value as string;
     } else {
       const newSecret = crypto.randomBytes(32).toString('base64');
       await prisma.config.create({
         data: {
           key: configKey,
-          config: { value: newSecret }
+          // SQLite: config 字段是 String(JSON 序列化)
+          config: JSON.stringify({ value: newSecret })
         }
       });
       secret = newSecret;

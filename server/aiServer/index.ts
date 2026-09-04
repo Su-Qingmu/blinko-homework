@@ -123,16 +123,19 @@ export class AiService {
       const doc: any = { text: content };
       const chunks = await doc.chunk();
 
-      const { embeddings } = await (async () => ({ embeddings: [] as any[] }))() // embedMany disabled
-        values: chunks.map((chunk) => chunk.text + 'Create At: ' + updatedAt?.toISOString() + ' Update At: ' + updatedAt?.toISOString()),
-        model: Embeddings,
-      });
-
-      await VectorStore.upsert({
-        indexName: 'blinko',
-        vectors: embeddings,
-        metadata: chunks?.map((chunk) => ({ text: chunk.text, id, noteId: id, isAttachment: true, updatedAt })),
-      });
+      // RAG / 向量索引功能在精简版中禁用(Mastra + VectorStore 已删除)
+      // 保留 Embeddings 引用仅为保持 API 兼容,实际不上传向量
+      const embeddings: any[] = [];
+      // const { embeddings } = await (async () => ({ embeddings: [] as any[] }))() // embedMany disabled
+      //   values: chunks.map((chunk) => chunk.text + 'Create At: ' + updatedAt?.toISOString() + ' Update At: ' + updatedAt?.toISOString()),
+      //   model: Embeddings,
+      // });
+      //
+      // await VectorStore.upsert({
+      //   indexName: 'blinko',
+      //   vectors: embeddings,
+      //   metadata: chunks?.map((chunk) => ({ text: chunk.text, id, noteId: id, isAttachment: true, updatedAt })),
+      // });
 
       try {
         const note = await prisma.notes.findUnique({

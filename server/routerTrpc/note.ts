@@ -130,19 +130,19 @@ export const noteRouter = router({
           OR: [
             {
               accountId: Number(ctx.id),
-              content: { contains: searchText, mode: 'insensitive' }
+              content: { contains: searchText }
             },
             {
               accountId: Number(ctx.id),
-              attachments: { some: { path: { contains: searchText, mode: 'insensitive' } } }
+              attachments: { some: { path: { contains: searchText } } }
             },
             {
               internalShares: { some: { accountId: Number(ctx.id) } },
-              content: { contains: searchText, mode: 'insensitive' }
+              content: { contains: searchText }
             },
             {
               internalShares: { some: { accountId: Number(ctx.id) } },
-              attachments: { some: { path: { contains: searchText, mode: 'insensitive' } } }
+              attachments: { some: { path: { contains: searchText } } }
             }
           ],
         };
@@ -180,14 +180,14 @@ export const noteRouter = router({
         where.createdAt = { gte: startDate, lte: endDate };
       }
       if (withLink) {
-        where.OR = [{ content: { contains: 'http://', mode: 'insensitive' } }, { content: { contains: 'https://', mode: 'insensitive' } }];
+        where.OR = [{ content: { contains: 'http://' } }, { content: { contains: 'https://' } }];
       }
       if (hasTodo) {
         where.OR = [
-          { content: { contains: '- [ ]', mode: 'insensitive' } },
-          { content: { contains: '- [x]', mode: 'insensitive' } },
-          { content: { contains: '* [ ]', mode: 'insensitive' } },
-          { content: { contains: '* [x]', mode: 'insensitive' } },
+          { content: { contains: '- [ ]' } },
+          { content: { contains: '- [x]' } },
+          { content: { contains: '* [ ]' } },
+          { content: { contains: '* [x]' } },
         ];
       }
       const config = await getGlobalConfig({ ctx });
@@ -310,7 +310,7 @@ export const noteRouter = router({
               isShare: true,
               sharePassword: '',
               OR: [{ shareExpiryDate: { gt: new Date() } }, { shareExpiryDate: null }],
-              ...(searchText != '' && { content: { contains: searchText, mode: 'insensitive' } }),
+              ...(searchText != '' && { content: { contains: searchText } }),
             },
             orderBy: [{ isTop: 'desc' }, { updatedAt: 'desc' }],
             skip: (page - 1) * size,

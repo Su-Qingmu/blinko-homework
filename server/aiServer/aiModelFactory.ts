@@ -13,7 +13,7 @@ import { webExtra } from './tools/webExtra';
 import { searchBlinkoTool } from './tools/searchBlinko';
 import { updateBlinkoTool } from './tools/updateBlinko';
 import { deleteBlinkoTool } from './tools/deleteBlinko';
-import { createScheduledTaskTool, deleteScheduledTaskTool, listScheduledTasksTool } from './tools/scheduledTask';
+// import { createScheduledTaskTool, deleteScheduledTaskTool, listScheduledTasksTool } from './tools/scheduledTask'; // 定时任务已下线
 // MCP removed in simplified build
 // rerank from @mastra/rag removed in simplified build (no embeddings/RAG)
 import { prisma } from '@server/prisma';
@@ -284,9 +284,10 @@ export class AiModelFactory {
           webExtra,
           webSearchTool,
           createCommentTool,
-          createScheduledTaskTool,
-          deleteScheduledTaskTool,
-          listScheduledTasksTool,
+          // 定时任务工具已下线
+          // createScheduledTaskTool,
+          // deleteScheduledTaskTool,
+          // listScheduledTasksTool,
         },
       };
     }

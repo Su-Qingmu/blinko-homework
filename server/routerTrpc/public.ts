@@ -220,10 +220,6 @@ export const publicRouter = router({
         data: input.data,
       };
     }),
-        },
-        { ttl: 60 * 60 * 1000 * 24 * 365 },
-      );
-    }),
   siteInfo: publicProcedure
     .meta({
       openapi: { method: 'GET', path: '/v1/public/site-info', summary: 'Get site info', tags: ['Public'] },

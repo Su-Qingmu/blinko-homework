@@ -10,7 +10,8 @@ import { useTranslation } from "react-i18next";
 import { Item } from "./Item";
 import { useEffect, useState } from "react";
 import { CollapsibleCard } from "@/components/Common/CollapsibleCard";
-import packageJson from '../../../src-tauri/tauri.conf.json';
+// Tauri 桌面端已删除,改用前端 package.json 显示客户端版本
+import packageJson from '../../../package.json';
 import { isDesktop, isInTauri } from "@/lib/tauriHelper";
 import { ToastPlugin } from "@/store/module/Toast/Toast";
 import { UpdateProgressDialog } from "@/components/Common/UpdateProgressDialog";

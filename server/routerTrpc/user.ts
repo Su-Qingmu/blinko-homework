@@ -210,8 +210,14 @@ export const userRouter = router({
           return true
         } else {
           const res = await prisma.config.findFirst({ where: { key: 'isAllowRegister' } })
-          //@ts-ignore
-          return res?.config.value === true
+          // SQLite: config 字段是 String(JSON 序列化),需要 parse 后取值
+          if (!res?.config) return false
+          try {
+            const parsed = JSON.parse(res.config)
+            return parsed?.value === true
+          } catch {
+            return false
+          }
         }
       } catch (error) {
         console.log(error, 'canRegister error')
@@ -253,7 +259,8 @@ export const userRouter = router({
           await prisma.config.create({
             data: {
               key: 'theme',
-              config: { value: 'system' },
+              // SQLite: config 字段是 String(JSON 序列化)
+              config: JSON.stringify({ value: 'system' }),
               userId: res.id
             }
           })

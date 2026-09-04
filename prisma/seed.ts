@@ -239,13 +239,16 @@ function detectFontCategory(fontName: string): string {
   return "sans-serif";
 }
 
-main()
-  .then(e => {
-    console.log("✨ Seed done! ✨")
-  })
-  .catch((e) => {
-    console.error(e);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// 只在直接运行 seed.ts 时才执行 main()（被 import 时不跑，避免 fonts/config 等副作用）
+if (import.meta.main) {
+  main()
+    .then(e => {
+      console.log("✨ Seed done! ✨")
+    })
+    .catch((e) => {
+      console.error(e);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

@@ -88,17 +88,17 @@
     "vanilla-tilt": "^1.8.1",
     "vditor": "3.11.2",
     "zod": "^4.1.12",
-    "@tauri-apps/api": "^2.5.0",
-    "@tauri-apps/plugin-autostart": "^2.5.0",
-    "@tauri-apps/plugin-fs": "^2.5.0",
-    "@tauri-apps/plugin-process": "^2.5.0",
-    "@tauri-apps/plugin-updater": "^2.5.0"
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-autostart": "^2.5.1",
+    "@tauri-apps/plugin-fs": "^2.5.2",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.11.0"
   },
   "devDependencies": {
     "@headlessui/tailwindcss": "^0.2.2",
     "@iconify/json": "^2.2.331",
     "@tailwindcss/typography": "^0.5.16",
-    "@tauri-apps/cli": "2.5.0",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@types/systemjs": "^6.15.3",
