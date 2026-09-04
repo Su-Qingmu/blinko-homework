@@ -49,6 +49,12 @@ export class BaseStore implements Store {
       hiddenMobile: true,
       icon: 'hugeicons:settings-01',
     },
+    // 协作模块:第 7 项
+    {
+      title: 'collaboration',
+      href: '/collaboration',
+      icon: 'hugeicons:user-multiple',
+    },
   ];
   currentRouter = this.routerList[0];
   currentQuery = {};
