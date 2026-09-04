@@ -1,7 +1,6 @@
 'use client';
 import { observer } from 'mobx-react-lite';
 import { useState } from 'react';
-import { CommonLayout } from '@/components/Layout';
 import { RootStore } from '@/store';
 import { TeamStore, type CollabSection } from '@/store/teamStore';
 import { ScrollArea } from '@/components/Common/ScrollArea';
@@ -34,8 +33,7 @@ const CollaborationPage = observer(() => {
   ];
 
   return (
-    <CommonLayout>
-      <ScrollArea fixMobileTopBar className="px-4 md:px-6 py-4 mx-auto max-w-7xl">
+    <ScrollArea fixMobileTopBar className="px-4 md:px-6 py-4 mx-auto max-w-7xl">
         {/* 顶部:团队选择 + 新建 */}
         <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -135,8 +133,7 @@ const CollaborationPage = observer(() => {
         ) : null}
 
         <CreateTeamDialog open={createOpen} onOpenChange={setCreateOpen} />
-      </ScrollArea>
-    </CommonLayout>
+    </ScrollArea>
   );
 });
 
