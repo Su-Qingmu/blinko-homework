@@ -35,6 +35,12 @@ model accounts {
   notifications notifications[]
   conversations conversation[]
   sharedNotes   noteInternalShare[]
+  // 协作模块反向关系
+  ownedTeams         teams[]            @relation("OwnedTeams")
+  teamMembers        teamMembers[]
+  invitesCreated     inviteLinks[]
+  teamActivities     teamActivities[]
+  teamNotesShared    teamNotes[]
 }
 
 model attachments {
@@ -93,6 +99,8 @@ model notes {
   comments          comments[]      @relation("NoteComments")
   histories         noteHistory[]
   internalShares    noteInternalShare[]
+  // 协作模块:笔记属于某个团队
+  teamShares        teamNotes[]
 }
 
 model comments {
@@ -285,6 +293,98 @@ model aiModels {
   provider      aiProviders @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([providerId])
+}
+
+// ============================================================
+// 协作模块:5 个新 model (Phase 1 of 协作功能)
+// ============================================================
+
+model teams {
+  id          Int      @id @default(autoincrement())
+  name        String
+  icon        String   @default("")
+  description String   @default("")
+  ownerId     Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner     accounts         @relation("OwnedTeams", fields: [ownerId], references: [id])
+  members   teamMembers[]
+  invites   inviteLinks[]
+  notes     teamNotes[]
+  activity  teamActivities[]
+
+  @@index([ownerId])
+}
+
+model teamMembers {
+  id           Int       @id @default(autoincrement())
+  teamId       Int
+  accountId    Int
+  role         String    @default("member") // owner | admin | member | guest
+  status       String    @default("active") // active | pending
+  joinedAt     DateTime  @default(now())
+  lastActiveAt DateTime?
+
+  team    teams    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  account accounts @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, accountId])
+  @@index([accountId])
+}
+
+model inviteLinks {
+  id          Int       @id @default(autoincrement())
+  teamId      Int
+  token       String    @unique           // URL 中使用的随机字符串
+  name        String    @default("")
+  role        String    @default("member") // 加入后的角色
+  expiresAt   DateTime?                    // null = 永久
+  maxUses     Int?                          // null = 不限
+  usedCount   Int        @default(0)
+  isActive    Boolean    @default(true)
+  createdById Int
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  team      teams    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdBy accounts @relation(fields: [createdById], references: [id])
+
+  @@index([teamId])
+  @@index([token])
+}
+
+model teamActivities {
+  id         Int      @id @default(autoincrement())
+  teamId     Int
+  accountId  Int?
+  action     String                                 // 'member.add' | 'member.remove' | 'role.change' | 'invite.create' | 'invite.use' | 'note.share' | 'team.update' ...
+  targetType String?                                // 'note' | 'member' | 'invite' | 'team'
+  targetId   Int?
+  metadata   String?                                // JSON-encoded 额外上下文
+  createdAt  DateTime @default(now())
+
+  team    teams     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  account accounts? @relation(fields: [accountId], references: [id])
+
+  @@index([teamId, createdAt])
+  @@index([accountId])
+}
+
+model teamNotes {
+  id         Int      @id @default(autoincrement())
+  teamId     Int
+  noteId     Int
+  canEdit    Boolean  @default(true)
+  sharedById Int
+  createdAt  DateTime @default(now())
+
+  team     teams    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  note     notes    @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  sharedBy accounts @relation(fields: [sharedById], references: [id])
+
+  @@unique([teamId, noteId])
+  @@index([noteId])
 }
 
 

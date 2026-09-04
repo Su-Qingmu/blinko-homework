@@ -14,6 +14,12 @@ import { commentRouter } from './comment';
 import { conversationRouter } from './conversation';
 import { publicRouter } from './public';
 import { messageRouter } from './message';
+// 协作模块 (新增 5 个 router,Phase 1)
+import { teamRouter } from './team';
+import { teamMemberRouter } from './teamMember';
+import { inviteRouter } from './invite';
+import { activityRouter } from './activity';
+import { teamNoteRouter } from './teamNote';
 import {
   notificationRouter, fontRouter, analyticsRouter, mcpServersRouter,
   aiScheduledTaskRouter, pluginRouter, followsRouter, attachmentsRouter, taskRouter,
@@ -28,6 +34,12 @@ export const appRouter = router({
   comments: commentRouter,
   conversation: conversationRouter,
   message: messageRouter,
+  // 协作模块 (Phase 1)
+  team: teamRouter,
+  teamMember: teamMemberRouter,
+  invite: inviteRouter,
+  activity: activityRouter,
+  teamNote: teamNoteRouter,
   // Stubs to satisfy AppRouter type; procedures return empty/null at runtime
   attachments: attachmentsRouter,
   follows: followsRouter,

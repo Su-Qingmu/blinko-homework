@@ -431,3 +431,91 @@ export const mcpServersSchema = z.object({
 
 export type mcpServers = z.infer<typeof mcpServersSchema>
 
+
+/////////////////////////////////////////
+// COLLABORATION MODULE SCHEMAS (协作模块)
+// Phase 1 of 协作功能:teams / teamMembers / inviteLinks / teamActivities / teamNotes
+/////////////////////////////////////////
+
+export const teamsSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  icon: z.string(),
+  description: z.string(),
+  ownerId: z.number().int(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+export type teams = z.infer<typeof teamsSchema>
+
+export const teamMembersSchema = z.object({
+  id: z.number().int(),
+  teamId: z.number().int(),
+  accountId: z.number().int(),
+  role: z.string(),          // owner | admin | member | guest
+  status: z.string(),        // active | pending
+  joinedAt: z.coerce.date(),
+  lastActiveAt: z.coerce.date().nullable().optional(),
+})
+export type teamMembers = z.infer<typeof teamMembersSchema>
+
+export const inviteLinksSchema = z.object({
+  id: z.number().int(),
+  teamId: z.number().int(),
+  token: z.string(),
+  name: z.string(),
+  role: z.string(),
+  expiresAt: z.coerce.date().nullable().optional(),
+  maxUses: z.number().int().nullable().optional(),
+  usedCount: z.number().int(),
+  isActive: z.boolean(),
+  createdById: z.number().int(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+export type inviteLinks = z.infer<typeof inviteLinksSchema>
+
+export const teamActivitiesSchema = z.object({
+  id: z.number().int(),
+  teamId: z.number().int(),
+  accountId: z.number().int().nullable().optional(),
+  action: z.string(),
+  targetType: z.string().nullable().optional(),
+  targetId: z.number().int().nullable().optional(),
+  metadata: z.any().nullable().optional(),
+  createdAt: z.coerce.date(),
+})
+export type teamActivities = z.infer<typeof teamActivitiesSchema>
+
+export const teamNotesSchema = z.object({
+  id: z.number().int(),
+  teamId: z.number().int(),
+  noteId: z.number().int(),
+  canEdit: z.boolean(),
+  sharedById: z.number().int(),
+  createdAt: z.coerce.date(),
+})
+export type teamNotes = z.infer<typeof teamNotesSchema>
+
+// 协作模块的角色常量
+export const TEAM_ROLE = {
+  OWNER: 'owner',
+  ADMIN: 'admin',
+  MEMBER: 'member',
+  GUEST: 'guest',
+} as const
+export type TeamRole = typeof TEAM_ROLE[keyof typeof TEAM_ROLE]
+
+// 角色权限判定 (从低到高:guest < member < admin < owner)
+const ROLE_RANK: Record<TeamRole, number> = {
+  guest: 0,
+  member: 1,
+  admin: 2,
+  owner: 3,
+}
+export function isRoleAtLeast(actual: string, required: TeamRole): boolean {
+  const a = ROLE_RANK[actual as TeamRole]
+  const r = ROLE_RANK[required]
+  if (a === undefined || r === undefined) return false
+  return a >= r
+}
