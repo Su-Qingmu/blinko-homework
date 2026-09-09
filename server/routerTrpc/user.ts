@@ -245,7 +245,6 @@ export const userRouter = router({
         // createSeed 包含多个 createMany + executeRaw + 文件复制
         // 不能放在 $transaction 里（默认 5s 超时会不够）
         // 这里把核心账号创建放事务，种子数据放事务外
-        const apiToken = await generateApiToken({ name, role: 'superadmin' })
         let newUserId: number
         try {
           newUserId = await prisma.$transaction(async (tx) => {
@@ -255,8 +254,13 @@ export const userRouter = router({
                 password: passwordHash,
                 nickname: name,
                 role: 'superadmin',
-                apiToken,
               }
+            })
+            // 创建后生成 apiToken 并 update（需要 id）
+            const apiToken = await generateApiToken({ id: res.id, name, role: 'superadmin' })
+            await tx.accounts.update({
+              where: { id: res.id },
+              data: { apiToken }
             })
             await tx.config.create({
               data: {
@@ -307,8 +311,10 @@ export const userRouter = router({
             message: 'Username already exists'
           });
         }
-        const apiToken = await generateApiToken({ name, role: 'user' })
-        await prisma.accounts.create({ data: { name, password: passwordHash, nickname: name, role: 'user', apiToken } })
+        // 创建后生成 apiToken（需要 id）
+        const user = await prisma.accounts.create({ data: { name, password: passwordHash, nickname: name, role: 'user' } })
+        const apiToken = await generateApiToken({ id: user.id, name, role: 'user' })
+        await prisma.accounts.update({ where: { id: user.id }, data: { apiToken } })
         return true
       }
     }),

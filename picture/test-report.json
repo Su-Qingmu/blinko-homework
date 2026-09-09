@@ -1,0 +1,123 @@
+{
+  "timestamp": "2026-09-09 10:34:23",
+  "user": "test921007",
+  "summary": {
+    "pass": 11,
+    "fail": 5,
+    "total": 16
+  },
+  "results": [
+    {
+      "name": "访问首页",
+      "status": "PASS",
+      "duration_s": 15.84,
+      "error": null
+    },
+    {
+      "name": "检查登录页元素",
+      "status": "PASS",
+      "duration_s": 7.52,
+      "error": null
+    },
+    {
+      "name": "注册页",
+      "status": "PASS",
+      "duration_s": 16.17,
+      "error": null
+    },
+    {
+      "name": "填注册表",
+      "status": "PASS",
+      "duration_s": 11.94,
+      "error": null
+    },
+    {
+      "name": "提交注册",
+      "status": "PASS",
+      "duration_s": 9.09,
+      "error": null
+    },
+    {
+      "name": "去登录页",
+      "status": "PASS",
+      "duration_s": 12.33,
+      "error": null
+    },
+    {
+      "name": "登录",
+      "status": "PASS",
+      "duration_s": 21.01,
+      "error": null
+    },
+    {
+      "name": "探索主页",
+      "status": "PASS",
+      "duration_s": 0.55,
+      "error": null
+    },
+    {
+      "name": "跳到笔记",
+      "status": "FAIL",
+      "duration_s": 30.03,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text(\\\"笔记\\\"), button:has-text(\\\"笔记\\\")\").first\n    - locator resolved"
+    },
+    {
+      "name": "创建笔记",
+      "status": "PASS",
+      "duration_s": 3.07,
+      "error": null
+    },
+    {
+      "name": "保存笔记",
+      "status": "PASS",
+      "duration_s": 0.05,
+      "error": null
+    },
+    {
+      "name": "闪念速记",
+      "status": "PASS",
+      "duration_s": 2.41,
+      "error": null
+    },
+    {
+      "name": "AI 对话",
+      "status": "FAIL",
+      "duration_s": 30.03,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"a[href*=\\\"ai\\\"]\").first\n    - locator resolved to <a href=\"/ai\" data-disco"
+    },
+    {
+      "name": "团队协作",
+      "status": "FAIL",
+      "duration_s": 30.04,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text(\\\"协作\\\")\").first\n    - locator resolved to <a data-discover=\"tru"
+    },
+    {
+      "name": "设置页",
+      "status": "FAIL",
+      "duration_s": 30.03,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text(\\\"设置\\\")\").first\n    - locator resolved to <a href=\"/settings\" d"
+    },
+    {
+      "name": "统计页",
+      "status": "FAIL",
+      "duration_s": 30.02,
+      "error": "TimeoutError: Locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"a:has-text(\\\"统计\\\")\").first\n    - locator resolved to <a href=\"/analytics\" "
+    }
+  ],
+  "console_errors_unique": [
+    "[warning] [.WebGL-0x2c057d2600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)",
+    "[error] Element with ID 'page-wrap' not found",
+    "[warning] loadingLock true",
+    "[error] Warning: %s: Support for defaultProps will be removed from function components in a future major release. Use JavaScript default parameters instead.%s $e \n    at $e (http://localhost:1111/node_modules",
+    "[warning] [.WebGL-0x2c057d2600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "[pageerror] Unexpected token '<'",
+    "[error] Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "[pageerror] Lute is not defined",
+    "[error] Element with ID 'outer-container' not found",
+    "[error] Warning: validateDOMNesting(...): %s cannot appear as a descendant of <%s>.%s <a> a \n    at a\n    at http://localhost:1111/node_modules/.vite/deps/chunk-TFD3C3JN.js?v=29ad3d5d:11665:7\n    at a\n    at ",
+    "[error] Warning: validateDOMNesting(...): %s cannot appear as a descendant of <%s>.%s <div> p \n    at div\n    at http://localhost:1111/node_modules/.vite/deps/@heroui_react.js?v=29ad3d5d:7685:7\n    at p\n    a"
+  ],
+  "network_errors_unique": [
+    "GET http://localhost:1111/api/trpc/tags.list?input=%7B%22json%22%3Anull%2C%22meta%22%3A%7B%22values%22%3A%5B%22undefined%22%"
+  ]
+}

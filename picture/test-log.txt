@@ -1,0 +1,42 @@
+[INFO] 
+=== F01 注册 ===
+[INFO] 📸 final-f01-registered.png (365KB)
+[INFO] 
+=== F02 登录 ===
+[INFO] 📸 final-f02-logged-in.png (80KB)
+[INFO]   登录后 URL: http://localhost:1111/
+[INFO] 
+=== F03 闪念速记 ===
+[INFO] 📸 final-f03-quicknote-modal.png (66KB)
+[INFO] 
+=== F04 闪念列表 ===
+[INFO] 📸 final-f04-quicknote-list.png (5KB)
+[INFO] 
+=== F05 创建笔记 ===
+[INFO] 📸 final-f05-notes-page.png (5KB)
+[INFO]   + 按钮位置: {'x': 1158, 'y': 16, 'width': 170, 'height': 32}
+[INFO] 📸 final-f05-modal-after-click.png (61KB)
+[INFO]   找到编辑器: [contenteditable="true"]:visible
+[INFO] 
+=== F06 笔记列表 ===
+[INFO] 📸 final-f06-notes-list.png (5KB)
+[INFO] 
+=== F07 标签管理 ===
+[INFO] 📸 final-f07-settings.png (5KB)
+[INFO] 
+=== F08 AI 对话 ===
+[INFO] 📸 final-f08-ai-page.png (5KB)
+[INFO] 
+=== F09 团队创建 ===
+[INFO] 📸 final-f09-collab-page.png (5KB)
+[INFO] 
+=== F10 搜索 ===
+[INFO] 📸 final-f10-before-search.png (5KB)
+[INFO] 
+======================================================================
+[INFO] 常用功能测试总结
+[INFO] ======================================================================
+[INFO] 通过: 4/10    不通过: 6/10    Bug 率: 60.0%
+[INFO] 目标: bug 率 < 20%（最多 2 个 bug）
+[INFO] 
+[INFO] 详细结果:
