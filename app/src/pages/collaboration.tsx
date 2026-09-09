@@ -27,7 +27,7 @@ const CollaborationPage = observer(() => {
   const sectionKeys: { key: CollabSection; label: string; icon: string }[] = [
     { key: 'overview', label: t('collab-tab-overview'), icon: 'hugeicons:dashboard-01' },
     { key: 'notes', label: t('collab-tab-notes'), icon: 'hugeicons:note' },
-    { key: 'members', label: t('collab-tab-members'), icon: 'hugeicons:user-multiple' },
+    { key: 'members', label: t('collab-tab-members'), icon: 'tabler:users' },
     { key: 'invites', label: t('collab-tab-invites'), icon: 'hugeicons:link-01' },
     { key: 'activity', label: t('collab-tab-activity'), icon: 'hugeicons:activity-01' },
   ];
@@ -37,7 +37,7 @@ const CollaborationPage = observer(() => {
         {/* 顶部:团队选择 + 新建 */}
         <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Icon icon="hugeicons:user-multiple" width="24" height="24" className="text-primary" />
+            <Icon icon="tabler:users" width="24" height="24" className="text-primary" />
             <h1 className="text-xl md:text-2xl font-semibold truncate">{t('collaboration')}</h1>
             {currentTeam && (
               <Chip size="sm" variant="flat" color="primary" className="ml-2">
@@ -48,7 +48,7 @@ const CollaborationPage = observer(() => {
           <Button
             color="primary"
             size="sm"
-            startContent={<Icon icon="hugeicons:add-team" width="16" height="16" />}
+            startContent={<Icon icon="hugeicons:add-01" width="16" height="16" />}
             onPress={() => setCreateOpen(true)}
           >
             {t('collab-create-team')}

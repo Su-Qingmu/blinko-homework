@@ -20,7 +20,7 @@ export const CollabEmpty = observer(({ onCreate }: Props) => {
       <Button
         color="primary"
         size="lg"
-        startContent={<Icon icon="hugeicons:add-team" width="18" height="18" />}
+        startContent={<Icon icon="hugeicons:add-01" width="18" height="18" />}
         onPress={onCreate}
       >
         {t('collab-create-team')}

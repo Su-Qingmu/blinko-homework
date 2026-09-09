@@ -62,7 +62,7 @@ export const CreateTeamDialog = observer(({ open, onOpenChange }: Props) => {
         {(onClose) => (
           <>
             <ModalHeader className="flex items-center gap-2">
-              <Icon icon="hugeicons:add-team" width="20" height="20" className="text-primary" />
+              <Icon icon="hugeicons:add-01" width="20" height="20" className="text-primary" />
               {t('collab-create-team')}
             </ModalHeader>
             <ModalBody className="gap-3">
