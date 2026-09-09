@@ -75,7 +75,7 @@ export const CollabMembers = observer(() => {
       {/* 成员表 */}
       {filtered.length === 0 ? (
         <div className="py-12 text-desc text-center">
-          <Icon icon="hugeicons:user-multiple" width="32" height="32" className="mx-auto mb-2 opacity-40" />
+          <Icon icon="tabler:users" width="32" height="32" className="mx-auto mb-2 opacity-40" />
           <p>{t('collab-no-members')}</p>
         </div>
       ) : (

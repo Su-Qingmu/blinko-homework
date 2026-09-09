@@ -38,6 +38,8 @@
 
 <body>
   <div id="root"></div>
+  <!-- 预加载 Lute markdown 解析器（vditor 依赖），从本地 public 加载以避免 CDN 不可用 -->
+  <script src="/lute/lute.min.js"></script>
   <script type="module" src="/src/main.tsx"></script>
   <script type="text/javascript" id="vditorIconScript">
     document.body.insertAdjacentHTML('afterBegin', `

@@ -29,7 +29,7 @@ export class BaseStore implements Store {
     {
       title: 'ai',
       href: '/ai',
-      icon: 'hugeicons:sparkles',
+      icon: 'hugeicons:ai-magic',
     },
     {
       title: 'analytics',
@@ -53,7 +53,7 @@ export class BaseStore implements Store {
     {
       title: 'collaboration',
       href: '/collaboration',
-      icon: 'hugeicons:user-multiple',
+      icon: 'tabler:users',
     },
   ];
   currentRouter = this.routerList[0];

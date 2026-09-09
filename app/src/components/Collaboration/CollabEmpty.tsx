@@ -13,7 +13,7 @@ export const CollabEmpty = observer(({ onCreate }: Props) => {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-fuchsia-500/15 to-pink-500/15 flex items-center justify-center mb-4">
-        <Icon icon="hugeicons:user-multiple" width="40" height="40" className="text-primary" />
+        <Icon icon="tabler:users" width="40" height="40" className="text-primary" />
       </div>
       <h2 className="text-xl font-semibold mb-2">{t('collab-no-team')}</h2>
       <p className="text-desc max-w-md mb-6">{t('collab-no-team-hint')}</p>

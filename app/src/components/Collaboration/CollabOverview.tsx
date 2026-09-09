@@ -53,7 +53,7 @@ export const CollabOverview = observer(() => {
             size="sm"
             variant="flat"
             color="primary"
-            startContent={<Icon icon="hugeicons:user-multiple" width="16" height="16" />}
+            startContent={<Icon icon="tabler:users" width="16" height="16" />}
             onPress={() => teamStore.setSection('members')}
           >
             {t('collab-members')}
