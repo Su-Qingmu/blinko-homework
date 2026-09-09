@@ -237,57 +237,80 @@ export const userRouter = router({
     }))
     .output(z.union([z.boolean(), z.any()]))
     .mutation(async ({ input }) => {
-      return prisma.$transaction(async () => {
-        const { name, password } = input
-        const passwordHash = await hashPassword(password)
-        const count = await prisma.accounts.count()
-        if (count == 0) {
-          const res = await prisma.accounts.create({
-            data: {
-              name,
-              password: passwordHash,
-              nickname: name,
-              role: 'superadmin',
-            }
-          })
-          await prisma.accounts.update({
-            where: { id: res.id },
-            data: {
-              apiToken: await generateApiToken({ id: res.id, name, role: 'superadmin' })
-            }
-          })
-          await prisma.config.create({
-            data: {
-              key: 'theme',
-              // SQLite: config 字段是 String(JSON 序列化)
-              config: JSON.stringify({ value: 'system' }),
-              userId: res.id
-            }
-          })
-          await createSeed(res.id)
-          return true
-        } else {
-          const config = await prisma.config.findFirst({ where: { key: 'isAllowRegister' } })
-          //@ts-ignore
-          if (config?.config?.value === false || !config) {
+      const { name, password } = input
+      const passwordHash = await hashPassword(password)
+      const count = await prisma.accounts.count()
+      if (count == 0) {
+        // 首个用户走 superadmin 流程
+        // createSeed 包含多个 createMany + executeRaw + 文件复制
+        // 不能放在 $transaction 里（默认 5s 超时会不够）
+        // 这里把核心账号创建放事务，种子数据放事务外
+        const apiToken = await generateApiToken({ name, role: 'superadmin' })
+        let newUserId: number
+        try {
+          newUserId = await prisma.$transaction(async (tx) => {
+            const res = await tx.accounts.create({
+              data: {
+                name,
+                password: passwordHash,
+                nickname: name,
+                role: 'superadmin',
+                apiToken,
+              }
+            })
+            await tx.config.create({
+              data: {
+                key: 'theme',
+                // SQLite: config 字段是 String(JSON 序列化)
+                config: JSON.stringify({ value: 'system' }),
+                userId: res.id
+              }
+            })
+            return res.id
+          }, { timeout: 10000, maxWait: 5000 })
+        } catch (e: any) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: e?.message ?? 'register failed' })
+        }
+        // 种子数据放事务外，失败也不阻塞用户创建
+        try {
+          await createSeed(newUserId)
+        } catch (e) {
+          console.error('createSeed failed (non-fatal):', e)
+        }
+        return true
+      } else {
+        const config = await prisma.config.findFirst({ where: { key: 'isAllowRegister' } })
+        if (!config?.config) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'not allow register',
+          });
+        }
+        try {
+          const parsed = JSON.parse(config.config)
+          if (parsed?.value !== true) {
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
               message: 'not allow register',
             });
-          } else {
-            const hasSameUser = await prisma.accounts.findFirst({ where: { name } })
-            if (hasSameUser) {
-              throw new TRPCError({
-                code: 'CONFLICT',
-                message: 'Username already exists'
-              });
-            }
-            const res = await prisma.accounts.create({ data: { name, password: passwordHash, nickname: name, role: 'user' } })
-            await prisma.accounts.update({ where: { id: res.id }, data: { apiToken: await generateApiToken({ id: res.id, name, role: 'user' }) } })
-            return true
           }
+        } catch {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'not allow register',
+          });
         }
-      })
+        const hasSameUser = await prisma.accounts.findFirst({ where: { name } })
+        if (hasSameUser) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Username already exists'
+          });
+        }
+        const apiToken = await generateApiToken({ name, role: 'user' })
+        await prisma.accounts.create({ data: { name, password: passwordHash, nickname: name, role: 'user', apiToken } })
+        return true
+      }
     }),
   regenToken: authProcedure
     .meta({ openapi: { method: 'POST', path: '/v1/user/regen-token', summary: 'Regen token', tags: ['User'] } })
