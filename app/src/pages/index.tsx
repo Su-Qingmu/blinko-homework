@@ -4,7 +4,7 @@ import Masonry from 'react-masonry-css';
 import { useTranslation } from 'react-i18next';
 import { RootStore } from '@/store';
 import { BlinkoEditor } from '@/components/BlinkoEditor';
-import { ScrollArea } from '@/components/Common/ScrollArea';
+import { ScrollArea, ScrollAreaHandles } from '@/components/Common/ScrollArea';
 import { BlinkoCard } from '@/components/BlinkoCard';
 import { useMediaQuery } from 'usehooks-ts';
 import { BlinkoAddButton } from '@/components/BlinkoAddButton';
@@ -38,7 +38,7 @@ const Home = observer(() => {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [insertPosition, setInsertPosition] = useState<number | null>(null);
   const [isDragForbidden, setIsDragForbidden] = useState<boolean>(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<ScrollAreaHandles>(null);
 
   const currentListState = useMemo(() => {
     if (isNotesView) {
@@ -114,10 +114,12 @@ const Home = observer(() => {
     const savedPosition = sessionStorage.getItem('restore-scroll-position');
     if (savedPosition && scrollAreaRef.current) {
       const position = Number(savedPosition);
+      if (!Number.isFinite(position) || position < 0) {
+        sessionStorage.removeItem('restore-scroll-position');
+        return;
+      }
       setTimeout(() => {
-        if (scrollAreaRef.current) {
-          scrollAreaRef.current.scrollTop = position;
-        }
+        scrollAreaRef.current?.scrollTo(position);
         // Clear the saved position after restoring
         sessionStorage.removeItem('restore-scroll-position');
       }, 100);

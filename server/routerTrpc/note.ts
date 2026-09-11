@@ -151,7 +151,7 @@ export const noteRouter = router({
           where.isArchived = isArchived;
         }
         if (type != -1) {
-          where.type = type;
+          where.type = type === NoteType.BLINKO ? { in: [NoteType.BLINKO, -1] } : type;
         }
       } else {
         where.isRecycle = isRecycle;
@@ -159,7 +159,7 @@ export const noteRouter = router({
           where.isArchived = isArchived;
         }
         if (type != -1) {
-          where.type = type;
+          where.type = type === NoteType.BLINKO ? { in: [NoteType.BLINKO, -1] } : type;
         }
         if (isShare != null) {
           where.isShare = isShare;
@@ -842,7 +842,8 @@ export const noteRouter = router({
     .input(
       z.object({
         content: z.union([z.string(), z.null()]).default(null),
-        type: z.union([z.nativeEnum(NoteType), z.literal(-1)]).default(-1),
+        // New notes default to the regular Blinko type used by the home list.
+        type: z.union([z.nativeEnum(NoteType), z.literal(-1)]).default(NoteType.BLINKO),
         attachments: z
           .array(
             z.object({
@@ -867,6 +868,8 @@ export const noteRouter = router({
     .output(z.any())
     .mutation(async function ({ input, ctx }) {
       let { id, isArchived, isRecycle, type, attachments, content, isTop, isShare, references } = input;
+      // Treat the legacy sentinel as the default Blinko type when creating.
+      if (!id && type === -1) type = NoteType.BLINKO;
 
       // Check for internal sharing permission if updating an existing note
       let isSharedEditor = false;

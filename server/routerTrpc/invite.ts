@@ -185,21 +185,30 @@ export const inviteRouter = router({
       if (existing) {
         return { teamId: invite.teamId, teamName: invite.team.name };
       }
-      // 事务:加成员 + 计数 +1
-      await prisma.$transaction([
-        prisma.teamMembers.create({
+      // Reserve one use atomically before creating the membership. Without the
+      // conditional update, concurrent accepts could exceed maxUses.
+      await prisma.$transaction(async (tx) => {
+        const reserved = invite.maxUses === null
+          ? await tx.inviteLinks.updateMany({
+              where: { id: invite.id, isActive: true },
+              data: { usedCount: { increment: 1 } },
+            })
+          : await tx.inviteLinks.updateMany({
+              where: { id: invite.id, isActive: true, usedCount: { lt: invite.maxUses } },
+              data: { usedCount: { increment: 1 } },
+            });
+        if (reserved.count !== 1) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invite link usage limit reached' });
+        }
+        await tx.teamMembers.create({
           data: {
             teamId: invite.teamId,
             accountId,
             role: invite.role,
             status: 'active',
           },
-        }),
-        prisma.inviteLinks.update({
-          where: { id: invite.id },
-          data: { usedCount: { increment: 1 } },
-        }),
-      ]);
+        });
+      });
       await logActivity(invite.teamId, accountId, 'invite.use', {
         targetType: 'invite',
         targetId: invite.id,
