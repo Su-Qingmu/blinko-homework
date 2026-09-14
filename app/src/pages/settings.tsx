@@ -6,7 +6,6 @@ import { ScrollArea } from '@/components/Common/ScrollArea';
 import { UserStore } from '@/store/user';
 import { RootStore } from '@/store';
 import { UserSetting } from '@/components/BlinkoSettings/UserSetting';
-import { AboutSetting } from '@/components/BlinkoSettings/AboutSetting';
 import { useTranslation } from 'react-i18next';
 import { JSX } from 'react';
 import { ScrollableTabs, TabItem } from '@/components/Common/ScrollableTabs';
@@ -24,7 +23,7 @@ type SettingItem = {
   keywords?: string[];
 };
 
-// 精简版设置:只保留 5 项
+// 精简版设置:只保留 4 项
 // 删除: hotkey(Tauri 桌面端依赖)、httpproxy(代理)、task(定时任务)、storage(数据库配置)、
 //       music(音乐)、import(数据导入)、sso(单点登录)、export(数据导出)、plugin(插件)
 export const allSettings: SettingItem[] = [
@@ -57,16 +56,8 @@ export const allSettings: SettingItem[] = [
     title: 'AI',
     icon: 'hugeicons:ai-beautify',
     component: <AiSetting />,
-    requireAdmin: true,
-    keywords: ['ai', 'artificial intelligence', '人工智能'],
-  },
-  {
-    key: 'about',
-    title: ('about'),
-    icon: 'tabler:info-circle',
-    component: <AboutSetting />,
     requireAdmin: false,
-    keywords: ['about', 'information', '关于', '信息'],
+    keywords: ['ai', 'artificial intelligence', '人工智能'],
   },
 ];
 const Page = observer(() => {

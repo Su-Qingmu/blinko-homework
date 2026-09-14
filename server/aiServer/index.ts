@@ -249,9 +249,10 @@ export class AiService {
       console.log(cleanedConversations, 'conversations');
       const runtimeContext = new RuntimeContext();
       runtimeContext.set('accountId', Number(ctx.id));
-      const agent = await AiModelFactory.BaseChatAgent({
-        withTools,
-        withOnlineSearch: withOnline,
+       const agent = await AiModelFactory.BaseChatAgent({
+         withTools,
+         withOnlineSearch: withOnline,
+         accountId: Number(ctx.id),
         extraInstructions: contextParts.join('\n\n'),
       });
       const result = await agent.stream(cleanedConversations, { runtimeContext });
@@ -262,10 +263,10 @@ export class AiService {
     }
   }
 
-  static async AIComment({ content, noteId }: { content: string; noteId: number }) {
+  static async AIComment({ content, noteId, accountId }: { content: string; noteId: number; accountId?: number }) {
     try {
-      const note = await prisma.notes.findUnique({
-        where: { id: noteId },
+      const note = await prisma.notes.findFirst({
+        where: { id: noteId, ...(accountId ? { accountId } : {}) },
         select: { content: true, accountId: true },
       });
 
@@ -273,7 +274,7 @@ export class AiService {
         throw new Error('Note not found');
       }
 
-      const agent = await AiModelFactory.CommentAgent();
+      const agent = await AiModelFactory.CommentAgent(undefined, accountId ?? Number(note.accountId));
       const result = await agent.generate([
         {
           role: 'user',
@@ -289,6 +290,7 @@ export class AiService {
         data: {
           content: result.text.trim(),
           noteId,
+          accountId: accountId ?? Number(note.accountId),
           guestName: 'Blinko AI',
           guestIP: '',
           guestUA: '',
@@ -311,7 +313,7 @@ export class AiService {
 
       const caller = userCaller(ctx);
       // Get the configuration
-      const config = await AiModelFactory.globalConfig();
+       const config = await AiModelFactory.globalConfig(Number(ctx.id));
 
       // Check if post-processing is enabled
       if (!config.isUseAiPostProcessing) {
@@ -319,8 +321,8 @@ export class AiService {
       }
 
       // Fetch the note
-      const note = await prisma.notes.findUnique({
-        where: { id: noteId },
+      const note = await prisma.notes.findFirst({
+        where: { id: noteId, accountId: Number(ctx.id) },
         select: {
           content: true,
           accountId: true,
@@ -365,9 +367,10 @@ export class AiService {
         const withOnlineSearch = !!config.tavilyApiKey;
         // Process with AI using BaseChatAgent with tools
 
-        const agent = await AiModelFactory.BaseChatAgent({
-          withTools: true,
-          withOnlineSearch: withOnlineSearch,
+         const agent = await AiModelFactory.BaseChatAgent({
+           withTools: true,
+           withOnlineSearch: withOnlineSearch,
+           accountId: Number(ctx.id),
           extraInstructions: `You are an AI assistant that helps to process notes. You MUST use the available tools to complete your task.
 This is a one-time conversation, so you MUST take action immediately using the tools provided.
 You have access to tools that can help you modify notes, add comments, or create new notes.
@@ -394,7 +397,7 @@ Remember: ALWAYS use tools to implement your suggestions rather than just descri
       const prompt = config.aiCommentPrompt || 'Analyze the following note content. Extract key topics as tags and provide a brief summary of the main points.';
 
       // Process with AI
-      const agent = await AiModelFactory.CommentAgent();
+       const agent = await AiModelFactory.CommentAgent(undefined, Number(ctx.id));
       const result = await agent.generate([
         {
           role: 'user',
@@ -415,6 +418,7 @@ Remember: ALWAYS use tools to implement your suggestions rather than just descri
           data: {
             content: aiResponse,
             noteId,
+            accountId: Number(ctx.id),
             guestName: 'Blinko AI',
             guestIP: '',
             guestUA: '',
@@ -433,9 +437,9 @@ Remember: ALWAYS use tools to implement your suggestions rather than just descri
           const aiTagsPrompt = config.aiTagsPrompt
           let tagAgent: any;
           if (aiTagsPrompt != '') {
-            tagAgent = await AiModelFactory.TagAgent(aiTagsPrompt);
+             tagAgent = await AiModelFactory.TagAgent(aiTagsPrompt, Number(ctx.id));
           } else {
-            tagAgent = await AiModelFactory.TagAgent();
+             tagAgent = await AiModelFactory.TagAgent(undefined, Number(ctx.id));
           }
           const tags = await getAllPathTags();
           const result = await tagAgent.generate(
@@ -456,8 +460,9 @@ Remember: ALWAYS use tools to implement your suggestions rather than just descri
       if (processingMode === 'smartEdit' || processingMode === 'both') {
         try {
           const smartEditPrompt = config.aiSmartEditPrompt || 'Improve this note by organizing content, adding headers, and enhancing readability.';
-          const agent = await AiModelFactory.BaseChatAgent({
-            withTools: true,
+           const agent = await AiModelFactory.BaseChatAgent({
+             withTools: true,
+             accountId: Number(ctx.id),
             extraInstructions: `You are an AI assistant that helps to improve notes. You'll be provided with a note content, and your task is to enhance it according to instructions. You have access to tools that can help you modify the note. Use these tools to make the requested improvements.`,
           });
           const result = await agent.generate([
@@ -520,8 +525,12 @@ Remember: ALWAYS use tools to implement your suggestions rather than just descri
   }): Promise<string> {
     try {
       // Get voice model configuration
-      const voiceModel = await prisma.aiModels.findUnique({
-        where: { id: voiceModelId },
+      const voiceModel = await prisma.aiModels.findFirst({
+        where: {
+          id: voiceModelId,
+          accountId,
+          provider: { accountId },
+        },
         include: { provider: true },
       });
 
@@ -530,7 +539,7 @@ Remember: ALWAYS use tools to implement your suggestions rather than just descri
       }
 
       // Get audio provider
-      const { audioModel } = await AiModelFactory.GetProvider();
+      const { audioModel } = await AiModelFactory.GetProvider(accountId);
       // Read audio file
       const fs = await import('fs');
       if (!fs.existsSync(filePath)) {

@@ -63,11 +63,11 @@ export class AiModelFactory {
   }
 
   static async queryVector(query: string, accountId: number, _topK?: number) {
-    const { VectorStore, Embeddings } = await AiModelFactory.GetProvider();
+    const { VectorStore, Embeddings } = await AiModelFactory.GetProvider(accountId);
     if (!Embeddings) {
       throw new Error("No embeddings model config")
     }
-    const config = await AiModelFactory.globalConfig();
+    const config = await AiModelFactory.globalConfig(accountId);
     const topK = _topK ?? config.embeddingTopK ?? 3;
     const embeddingMinScore = config.embeddingScore ?? 0.4;
     const { embedding } = await embed({
@@ -140,13 +140,16 @@ export class AiModelFactory {
     // Vector index disabled in simplified build (no embeddings/RAG)
   }
 
-  static async globalConfig() {
-    return await getGlobalConfig({ useAdmin: true });
+  static async globalConfig(accountId?: number) {
+    return await getGlobalConfig({
+      ctx: accountId ? { id: String(accountId), role: 'user' } as any : undefined,
+      useAdmin: !accountId,
+    });
   }
 
-  static async getAiProvider(id: number) {
-    return await prisma.aiProviders.findUnique({
-      where: { id },
+  static async getAiProvider(id: number, accountId?: number) {
+    return await prisma.aiProviders.findFirst({
+      where: { id, ...(accountId ? { accountId } : {}) },
       include: { models: true }
     });
   }
@@ -158,9 +161,12 @@ export class AiModelFactory {
     });
   }
 
-  static async getAiModel(id: number) {
-    return await prisma.aiModels.findUnique({
-      where: { id },
+  static async getAiModel(id: number, accountId?: number) {
+    return await prisma.aiModels.findFirst({
+      where: {
+        id,
+        ...(accountId ? { accountId, provider: { accountId } } : {}),
+      },
       include: { provider: true }
     });
   }
@@ -179,34 +185,34 @@ export class AiModelFactory {
   }
 
 
-  static async ValidConfig() {
-    const globalConfig = await AiModelFactory.globalConfig();
+  static async ValidConfig(accountId?: number) {
+    const globalConfig = await AiModelFactory.globalConfig(accountId);
     if (!globalConfig.mainModelId) {
       throw new Error('Main AI model not configured!');
     }
-    return await AiModelFactory.globalConfig();
+    return globalConfig;
   }
 
-  static async GetProvider() {
-    const globalConfig = await AiModelFactory.ValidConfig();
+  static async GetProvider(accountId?: number) {
+    const globalConfig = await AiModelFactory.ValidConfig(accountId);
     if (!globalConfig.mainModelId) {
       throw new Error('Main AI model configuration not found!');
     }
-    const mainModel = await AiModelFactory.getAiModel(globalConfig.mainModelId);
+    const mainModel = await AiModelFactory.getAiModel(globalConfig.mainModelId, accountId);
     if (!mainModel) {
       throw new Error('Main AI model configuration not found!');
     }
 
     const embeddingModel = globalConfig.embeddingModelId
-      ? await AiModelFactory.getAiModel(globalConfig.embeddingModelId)
+      ? await AiModelFactory.getAiModel(globalConfig.embeddingModelId, accountId)
       : null;
 
     const audioModel = globalConfig.voiceModelId
-      ? await AiModelFactory.getAiModel(globalConfig.voiceModelId)
+      ? await AiModelFactory.getAiModel(globalConfig.voiceModelId, accountId)
       : null;
 
     const imageModel = globalConfig.imageModelId
-      ? await AiModelFactory.getAiModel(globalConfig.imageModelId)
+      ? await AiModelFactory.getAiModel(globalConfig.imageModelId, accountId)
       : null;
 
     // Initialize providers
@@ -271,8 +277,8 @@ export class AiModelFactory {
       }
     };
   }
-  static async BaseChatAgent({ withTools = true, withOnlineSearch = false, extraInstructions }: { withTools?: boolean; withOnlineSearch?: boolean; extraInstructions?: string }) {
-    const provider = await AiModelFactory.GetProvider();
+  static async BaseChatAgent({ withTools = true, withOnlineSearch = false, extraInstructions, accountId }: { withTools?: boolean; withOnlineSearch?: boolean; extraInstructions?: string; accountId?: number }) {
+    const provider = await AiModelFactory.GetProvider(accountId);
     let tools: Record<string, any> = {};
     if (withTools) {
       tools = {
@@ -299,7 +305,7 @@ export class AiModelFactory {
 
     // MCP tools removed in simplified build
 
-    const globalConfig = await AiModelFactory.globalConfig();
+    const globalConfig = await AiModelFactory.globalConfig(accountId);
     const defaultInstructions =
       `Today is ${dayjs().format('YYYY-MM-DD HH:mm:ss')}\n` +
       'You are a versatile AI assistant who can:\n' +
@@ -342,8 +348,8 @@ export class AiModelFactory {
       isWritingAgent?: boolean;
     },
   ) {
-    return async (type?: 'expand' | 'polish' | 'custom' | string) => {
-      const provider = await AiModelFactory.GetProvider();
+    return async (type?: 'expand' | 'polish' | 'custom' | string, accountId?: number) => {
+      const provider = await AiModelFactory.GetProvider(accountId);
       const finalPrompt = typeof systemPrompt === 'function' ? systemPrompt(type!) : systemPrompt;
 
       const agent = new Agent({

@@ -205,7 +205,7 @@ export const commentRouter = router({
 
       if (content.includes('@Blinko AI')) {
         import('@server/aiServer')
-          .then(({ AiService }) => AiService.AIComment({ content, noteId }))
+           .then(({ AiService }) => AiService.AIComment({ content, noteId, accountId: Number(ctx.id) }))
           .catch((error) => console.error('AI comment error:', error));
       }
 

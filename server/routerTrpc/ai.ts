@@ -19,7 +19,7 @@ export const aiRouter = router({
       content: z.string(),
       type: z.enum(['update', 'insert'])
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, content, type } = input
       const createTime = await prisma.notes.findUnique({ where: { id } }).then(i => i?.createdAt)
       const { ok, error } = await AiService.embeddingUpsert({ id, content, type, createTime: createTime! })
@@ -37,7 +37,7 @@ export const aiRouter = router({
       id: z.number(),
       filePath: z.string() //api/file/text.pdf
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, filePath } = input
       try {
         const res = await AiService.embeddingInsertAttachments({ id, filePath })
@@ -99,7 +99,7 @@ export const aiRouter = router({
     .input(z.object({
       filePath: z.string()
     }))
-    .mutation(async function ({ input }) {
+    .mutation(async function ({ input, ctx }) {
       // const { filePath } = input
       // try {
       //   const localFilePath = await FileService.getFile(filePath)
@@ -114,7 +114,7 @@ export const aiRouter = router({
     .input(z.object({
       force: z.boolean().optional()
     }))
-    .mutation(async function* ({ input }) {
+    .mutation(async function* ({ input, ctx }) {
       const { force } = input
       try {
         for await (const result of AiService.rebuildEmbeddingIndex({ force })) {
@@ -133,9 +133,9 @@ export const aiRouter = router({
       conversations: z.array(z.object({ role: z.string(), content: z.string() })),
       conversationId: z.number()
     }))
-    .mutation(async function ({ input }) {
+    .mutation(async function ({ input, ctx }) {
       const { conversations, conversationId } = input
-      const agent = await AiModelFactory.SummarizeAgent()
+       const agent = await AiModelFactory.SummarizeAgent(undefined, Number(ctx.id))
       const conversationString = JSON.stringify(
         conversations.map(i => ({
           role: i.role,
@@ -157,9 +157,9 @@ export const aiRouter = router({
       type: z.enum(['expand', 'polish', 'custom']).optional(),
       content: z.string().optional()
     }))
-    .mutation(async function* ({ input }) {
+    .mutation(async function* ({ input, ctx }) {
       const { question, type = 'custom', content } = input
-      const agent = await AiModelFactory.WritingAgent(type)
+       const agent = await AiModelFactory.WritingAgent(type, Number(ctx.id))
       const result = await agent.stream([
         {
           role: 'user',
@@ -174,10 +174,10 @@ export const aiRouter = router({
     .input(z.object({
       content: z.string()
     }))
-    .mutation(async function ({ input }) {
-      const config = await AiModelFactory.globalConfig();
+    .mutation(async function ({ input, ctx }) {
+       const config = await AiModelFactory.globalConfig(Number(ctx.id));
       const { content } = input
-      const tagAgent = await AiModelFactory.TagAgent(config.aiTagsPrompt || undefined);
+       const tagAgent = await AiModelFactory.TagAgent(config.aiTagsPrompt || undefined, Number(ctx.id));
       const tags = await getAllPathTags();
       const result = await tagAgent.generate(
         `Existing tags list: [${tags.join(', ')}]\nNote content: ${content}\nPlease suggest appropriate tags for this content. Include full hierarchical paths for tags like #Parent/Child instead of just #Child.`
@@ -188,9 +188,9 @@ export const aiRouter = router({
     .input(z.object({
       content: z.string()
     }))
-    .mutation(async function ({ input }) {
+    .mutation(async function ({ input, ctx }) {
       const { content } = input
-      const agent = await AiModelFactory.EmojiAgent()
+       const agent = await AiModelFactory.EmojiAgent(undefined, Number(ctx.id))
       const result = await agent.generate("Please select and suggest appropriate emojis for the above content" + content)
       console.log(result.text)
       return result?.text?.trim().split(',').map(tag => tag.trim()).filter(Boolean) ?? [];
@@ -200,8 +200,8 @@ export const aiRouter = router({
       content: z.string(),
       noteId: z.number()
     }))
-    .mutation(async function ({ input }) {
-      return await AiService.AIComment(input)
+    .mutation(async function ({ input, ctx }) {
+      return await AiService.AIComment({ ...input, accountId: Number(ctx.id) })
     }),
 
   // Embedding procedures removed in simplified build (no RAG / no vector store)
@@ -233,8 +233,8 @@ export const aiRouter = router({
         const { providerId, modelKey, capabilities } = input;
 
         // Get provider information
-        const provider = await prisma.aiProviders.findUnique({
-          where: { id: providerId }
+        const provider = await prisma.aiProviders.findFirst({
+          where: { id: providerId, accountId: Number(ctx.id) }
         });
 
         if (!provider) {
@@ -304,8 +304,12 @@ export const aiRouter = router({
     }),
 
   getAllProviders: authProcedure
-    .query(async () => {
-      return await AiModelFactory.getAllAiProviders();
+    .query(async ({ ctx }) => {
+      return await prisma.aiProviders.findMany({
+        where: { accountId: Number(ctx.id) },
+        include: { models: true },
+        orderBy: { sortOrder: 'asc' }
+      });
     }),
 
   createProvider: authProcedure
@@ -317,9 +321,9 @@ export const aiRouter = router({
       config: z.any().optional(),
       sortOrder: z.number().default(0)
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return await prisma.aiProviders.create({
-        data: input,
+        data: { ...input, accountId: Number(ctx.id) },
         include: { models: true }
       });
     }),
@@ -334,8 +338,11 @@ export const aiRouter = router({
       config: z.any().optional(),
       sortOrder: z.number().optional()
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
+      // 仅本人 provider
+      const target = await prisma.aiProviders.findFirst({ where: { id, accountId: Number(ctx.id) }, select: { id: true } });
+      if (!target) throw new TRPCError({ code: 'FORBIDDEN', message: 'provider not found or not yours' });
       return await prisma.aiProviders.update({
         where: { id },
         data,
@@ -347,15 +354,18 @@ export const aiRouter = router({
     .input(z.object({
       id: z.number()
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const target = await prisma.aiProviders.findFirst({ where: { id: input.id, accountId: Number(ctx.id) }, select: { id: true } });
+      if (!target) throw new TRPCError({ code: 'FORBIDDEN', message: 'provider not found or not yours' });
       return await prisma.aiProviders.delete({
         where: { id: input.id }
       });
     }),
 
   getAllModels: authProcedure
-    .query(async () => {
+    .query(async ({ ctx }) => {
       return await prisma.aiModels.findMany({
+        where: { accountId: Number(ctx.id) },
         include: { provider: true },
         orderBy: [{ provider: { sortOrder: 'asc' } }, { sortOrder: 'asc' }]
       });
@@ -365,9 +375,9 @@ export const aiRouter = router({
     .input(z.object({
       providerId: z.number()
     }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       return await prisma.aiModels.findMany({
-        where: { providerId: input.providerId },
+        where: { providerId: input.providerId, accountId: Number(ctx.id) },
         include: { provider: true },
         orderBy: { sortOrder: 'asc' }
       });
@@ -377,8 +387,15 @@ export const aiRouter = router({
     .input(z.object({
       capability: z.string()
     }))
-    .query(async ({ input }) => {
-      return await AiModelFactory.getAiModelsByCapability(input.capability);
+    .query(async ({ input, ctx }) => {
+      return await prisma.aiModels.findMany({
+        where: {
+          accountId: Number(ctx.id),
+          capabilities: { path: [input.capability], equals: true }
+        },
+        include: { provider: true },
+        orderBy: { sortOrder: 'asc' }
+      });
     }),
 
   createModel: authProcedure
@@ -399,9 +416,12 @@ export const aiRouter = router({
       config: z.any().optional(),
       sortOrder: z.number().default(0)
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // 校验 provider 属于本人
+      const p = await prisma.aiProviders.findFirst({ where: { id: input.providerId, accountId: Number(ctx.id) }, select: { id: true } });
+      if (!p) throw new TRPCError({ code: 'FORBIDDEN', message: 'provider not found or not yours' });
       return await prisma.aiModels.create({
-        data: input,
+        data: { ...input, accountId: Number(ctx.id) },
         include: { provider: true }
       });
     }),
@@ -424,8 +444,10 @@ export const aiRouter = router({
       config: z.any().optional(),
       sortOrder: z.number().optional()
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
+      const target = await prisma.aiModels.findFirst({ where: { id, accountId: Number(ctx.id) }, select: { id: true } });
+      if (!target) throw new TRPCError({ code: 'FORBIDDEN', message: 'model not found or not yours' });
       return await prisma.aiModels.update({
         where: { id },
         data,
@@ -437,7 +459,9 @@ export const aiRouter = router({
     .input(z.object({
       id: z.number()
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const target = await prisma.aiModels.findFirst({ where: { id: input.id, accountId: Number(ctx.id) }, select: { id: true } });
+      if (!target) throw new TRPCError({ code: 'FORBIDDEN', message: 'model not found or not yours' });
       return await prisma.aiModels.delete({
         where: { id: input.id }
       });
@@ -462,8 +486,14 @@ export const aiRouter = router({
         })
       }))
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { providerId, models } = input;
+
+      const provider = await prisma.aiProviders.findFirst({
+        where: { id: providerId, accountId: Number(ctx.id) },
+        select: { id: true }
+      });
+      if (!provider) throw new TRPCError({ code: 'FORBIDDEN', message: 'provider not found or not yours' });
 
       const createdModels: aiModels[] = [];
       for (const model of models) {
@@ -473,7 +503,8 @@ export const aiRouter = router({
             title: model.name,
             modelKey: model.id,
             capabilities: model.capabilities,
-            sortOrder: 0
+            sortOrder: 0,
+            accountId: Number(ctx.id)
           },
           include: { provider: true }
         });
@@ -502,8 +533,14 @@ export const aiRouter = router({
         }).optional()
       }))
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { providerId, selectedModels } = input;
+
+      const provider = await prisma.aiProviders.findFirst({
+        where: { id: providerId, accountId: Number(ctx.id) },
+        select: { id: true }
+      });
+      if (!provider) throw new TRPCError({ code: 'FORBIDDEN', message: 'provider not found or not yours' });
 
       const createdModels: aiModels[] = [];
       for (const model of selectedModels) {
@@ -522,7 +559,8 @@ export const aiRouter = router({
               embedding: false,
               rerank: false
             },
-            sortOrder: 0
+            sortOrder: 0,
+            accountId: Number(ctx.id)
           },
           include: { provider: true }
         });
@@ -536,11 +574,11 @@ export const aiRouter = router({
     .input(z.object({
       providerId: z.number()
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { providerId } = input;
 
-      const provider = await prisma.aiProviders.findUnique({
-        where: { id: providerId }
+      const provider = await prisma.aiProviders.findFirst({
+        where: { id: providerId, accountId: Number(ctx.id) }
       });
 
       if (!provider) {

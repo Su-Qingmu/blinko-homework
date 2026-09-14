@@ -61,8 +61,8 @@ export const getAiModelConfig = async (type: 'mainModel' | 'embeddingModel' | 'v
   }
 
   // Get the model with provider information directly from prisma
-  const model = await prisma.aiModels.findUnique({
-    where: { id: modelId },
+  const model = await prisma.aiModels.findFirst({
+    where: { id: modelId, accountId: userId, provider: { accountId: userId } },
     include: { provider: true }
   });
 
