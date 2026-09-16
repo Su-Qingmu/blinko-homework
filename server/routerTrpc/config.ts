@@ -5,6 +5,7 @@ import { GlobalConfig, ZConfigKey, ZConfigSchema, ZUserPerferConfigKey } from '.
 import { configSchema } from '@shared/lib/prismaZodType';
 import { Context } from '../context';
 import { reinitializeOAuthStrategies } from '../routerExpress/auth/config';
+import { parseJsonField, serializeJsonField, parseModelRow } from '../lib/jsonField';
 
 export const getGlobalConfig = async ({ ctx, useAdmin = false }: { ctx?: Context, useAdmin?: boolean }) => {
   const userId = Number(ctx?.id ?? 0);
@@ -12,7 +13,7 @@ export const getGlobalConfig = async ({ ctx, useAdmin = false }: { ctx?: Context
   const isSuperAdmin = useAdmin ? true : ctx?.role === 'superadmin';
 
   const globalConfig = configs.reduce((acc, item) => {
-    const config = item.config as { type: string, value: any };
+    const config = parseJsonField<{ type: string, value: any }>(item.config) || { type: 'unknown', value: null };
     //If not login return the frist config
     if (
       item.key == 'isCloseBackgroundAnimation'
@@ -70,16 +71,17 @@ export const getAiModelConfig = async (type: 'mainModel' | 'embeddingModel' | 'v
     return null;
   }
 
+  const parsedModel = parseModelRow(model);
   return {
-    title: model.title,
-    modelKey: model.modelKey,
-    capabilities: model.capabilities,
+    title: parsedModel.title,
+    modelKey: parsedModel.modelKey,
+    capabilities: parsedModel.capabilities,
     provider: {
-      id: model.provider.id,
-      title: model.provider.title,
-      provider: model.provider.provider,
-      baseURL: model.provider.baseURL,
-      apiKey: model.provider.apiKey
+      id: parsedModel.provider.id,
+      title: parsedModel.provider.title,
+      provider: parsedModel.provider.provider,
+      baseURL: parsedModel.provider.baseURL,
+      apiKey: parsedModel.provider.apiKey
     }
   };
 };
@@ -111,11 +113,11 @@ export const configRouter = router({
         
         if (matchedConfigs.length > 0) {
           const configToKeep = matchedConfigs[0];
-          updateResult = await prisma.config.update({ 
-            where: { id: configToKeep?.id }, 
-            data: { config: { type: typeof value, value } } 
+          updateResult = await prisma.config.update({
+            where: { id: configToKeep?.id },
+            data: { config: serializeJsonField({ type: typeof value, value }) }
           });
-          
+
           if (matchedConfigs.length > 1) {
             await prisma.config.deleteMany({
               where: {
@@ -126,21 +128,21 @@ export const configRouter = router({
             });
           }
         } else {
-          updateResult = await prisma.config.create({ data: { userId, key, config: { type: typeof value, value } } });
+          updateResult = await prisma.config.create({ data: { userId, key, config: serializeJsonField({ type: typeof value, value }) } });
         }
       } else {
         if (ctx.role !== 'superadmin') {
           throw new Error('You are not allowed to update global config')
         }
         const matchedConfigs = await prisma.config.findMany({ where: { key } });
-        
+
         if (matchedConfigs.length > 0) {
           const configToKeep = matchedConfigs[0];
-          updateResult = await prisma.config.update({ 
-            where: { id: configToKeep?.id }, 
-            data: { config: { type: typeof value, value } } 
+          updateResult = await prisma.config.update({
+            where: { id: configToKeep?.id },
+            data: { config: serializeJsonField({ type: typeof value, value }) }
           });
-          
+
           if (matchedConfigs.length > 1) {
             await prisma.config.deleteMany({
               where: {
@@ -150,7 +152,7 @@ export const configRouter = router({
             });
           }
         } else {
-          updateResult = await prisma.config.create({ data: { key, config: { type: typeof value, value } } });
+          updateResult = await prisma.config.create({ data: { key, config: serializeJsonField({ type: typeof value, value }) } });
         }
       }
 
@@ -181,9 +183,9 @@ export const configRouter = router({
       const { pluginName, key, value } = input
       const hasKey = await prisma.config.findFirst({ where: { userId, key: `plugin_config_${pluginName}_${key}` } })
       if (hasKey) {
-        return await prisma.config.update({ where: { id: hasKey.id }, data: { config: { type: typeof value, value } } })
+        return await prisma.config.update({ where: { id: hasKey.id }, data: { config: serializeJsonField({ type: typeof value, value }) } })
       }
-      return await prisma.config.create({ data: { userId, key: `plugin_config_${pluginName}_${key}`, config: { type: typeof value, value } } })
+      return await prisma.config.create({ data: { userId, key: `plugin_config_${pluginName}_${key}`, config: serializeJsonField({ type: typeof value, value }) } })
     }),
   getPluginConfig: authProcedure
     .meta({ openapi: { method: 'GET', path: '/v1/config/getPluginConfig', summary: 'Get plugin config', protect: true, tags: ['Config'] } })
@@ -204,7 +206,8 @@ export const configRouter = router({
       })
       return configs.reduce((acc, item) => {
         const key = item.key.replace(`plugin_config_${pluginName}_`, '');
-        acc[key] = (item.config as { value: any }).value;
+        const parsed = parseJsonField<{ value: any }>(item.config);
+        acc[key] = parsed?.value;
         return acc;
       }, {} as Record<string, any>);
     }),

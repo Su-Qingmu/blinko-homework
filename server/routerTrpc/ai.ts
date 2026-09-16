@@ -11,19 +11,7 @@ import { ModelCapabilities } from '@server/aiServer/types';
 import { aiProviders, aiModels } from '@shared/lib/prismaZodType';
 import { fetchWithProxy } from '@server/lib/proxy';
 import { inferModelCapabilities } from '@shared/lib/modelTemplates';
-
-// SQLite 下 Prisma 不支持原生 Json 类型,capabilities/config 字段存为 String(JSON 文本)
-// 写入前 stringify,读取后 parse,前端可正常当对象用
-function parseJsonField(s: string | null | undefined): any {
-  if (s == null) return null;
-  try { return JSON.parse(s); } catch { return null; }
-}
-function parseModelRow<T extends { capabilities: string; config: string | null }>(row: T): T & { capabilities: any; config: any } {
-  return { ...row, capabilities: parseJsonField(row.capabilities), config: parseJsonField(row.config) };
-}
-function parseProviderRow<T extends { config: string | null }>(row: T): T & { config: any } {
-  return { ...row, config: parseJsonField(row.config) };
-}
+import { parseModelRow, parseProviderRow } from '../lib/jsonField';
 
 export const aiRouter = router({
   embeddingUpsert: authProcedure
