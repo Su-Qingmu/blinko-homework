@@ -230,9 +230,14 @@ export class AiService {
       let ragNote: any[] = [];
       let ragNoteString = '';
       if (withRAG) {
-        let { notes, aiContext } = await AiModelFactory.queryVector(question, Number(ctx.id));
-        ragNote = notes;
-        ragNoteString = `This is the note content ${ragNote.map((i) => i.content).join('\n')} ${aiContext}`;
+        // embeddings/RAG removed in simplified build — queryVector 总是抛错,跳过 RAG
+        try {
+          let { notes, aiContext } = await AiModelFactory.queryVector(question, Number(ctx.id));
+          ragNote = notes;
+          ragNoteString = `This is the note content ${ragNote.map((i) => i.content).join('\n')} ${aiContext}`;
+        } catch (ragError) {
+          console.warn('[RAG] disabled in simplified build:', (ragError as Error).message);
+        }
       }
 
       const contextParts = [

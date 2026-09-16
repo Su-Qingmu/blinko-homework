@@ -14,7 +14,6 @@ import { DefaultModelsSection } from './DefaultModelsSection';
 import { GlobalPromptSection } from './GlobalPromptSection';
 import { AiPostProcessingSection } from './AiPostProcessingSection';
 import { AiToolsSection } from './AiToolsSection';
-import { EmbeddingSettingsSection } from './EmbeddingSettingsSection';
 import ModelDialogContent from './ModelDialogContent';
 import { McpServersSection } from './McpServersSection';
 import { AiSettingStore } from '@/store/aiSettingStore';
@@ -82,9 +81,6 @@ export default observer(function AiSetting() {
       </CollapsibleCard>
 
       <DefaultModelsSection />
-
-      <EmbeddingSettingsSection />
-
 
       <GlobalPromptSection />
 

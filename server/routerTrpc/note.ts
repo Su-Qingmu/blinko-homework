@@ -819,8 +819,14 @@ export const noteRouter = router({
       const keywordsResult = await agent.generate(extractionPrompt);
       const keywords = keywordsResult.text.trim();
       console.log("Extracted keywords:", keywords);
-      const { notes } = await AiModelFactory.queryVector(keywords, Number(ctx.id), 10);
-      return notes;
+      // embeddings/RAG removed in simplified build — queryVector 抛错,返回空数组
+      try {
+        const { notes } = await AiModelFactory.queryVector(keywords, Number(ctx.id), 10);
+        return notes;
+      } catch (ragError) {
+        console.warn('[findRelatedNotes] RAG disabled:', (ragError as Error).message);
+        return [];
+      }
     }),
   reviewNote: authProcedure
     .meta({ openapi: { method: 'POST', path: '/v1/note/review', summary: 'Review a note', protect: true, tags: ['Note'] } })

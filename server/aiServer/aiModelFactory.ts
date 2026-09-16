@@ -62,78 +62,9 @@ export class AiModelFactory {
     }
   }
 
-  static async queryVector(query: string, accountId: number, _topK?: number) {
-    const { VectorStore, Embeddings } = await AiModelFactory.GetProvider(accountId);
-    if (!Embeddings) {
-      throw new Error("No embeddings model config")
-    }
-    const config = await AiModelFactory.globalConfig(accountId);
-    const topK = _topK ?? config.embeddingTopK ?? 3;
-    const embeddingMinScore = config.embeddingScore ?? 0.4;
-    const { embedding } = await embed({
-      value: query,
-      model: Embeddings,
-    });
-
-    const result = await VectorStore.query({
-      indexName: 'blinko',
-      queryVector: embedding,
-      topK: topK,
-    });
-    let filteredResults = result.filter(({ score }) => score >= embeddingMinScore);
-
-    const notes =
-      (
-        await prisma.notes.findMany({
-          where: {
-            accountId: accountId,
-            id: {
-              in: _.uniqWith(filteredResults.map((i) => Number(i.metadata?.id))).filter((i) => !!i) as number[],
-            },
-          },
-          include: {
-            tags: { include: { tag: true } },
-            attachments: {
-              orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-            },
-            references: {
-              select: {
-                toNoteId: true,
-                toNote: {
-                  select: {
-                    content: true,
-                    createdAt: true,
-                    updatedAt: true,
-                  },
-                },
-              },
-            },
-            referencedBy: {
-              select: {
-                fromNoteId: true,
-                fromNote: {
-                  select: {
-                    content: true,
-                    createdAt: true,
-                    updatedAt: true,
-                  },
-                },
-              },
-            },
-            _count: {
-              select: {
-                comments: true,
-                histories: true,
-              },
-            },
-          },
-        })
-      ).map((i) => {
-        return { ...i, score: filteredResults.find((t) => Number(t.metadata?.id) == i.id)?.score ?? 0 };
-      }) ?? [];
-
-    let aiContext = notes.map((i) => i.content + '\n') || '';
-    return { notes, aiContext: aiContext };
+  static async queryVector(_query: string, _accountId: number, _topK?: number) {
+    // embeddings/RAG removed in simplified build (CLAUDE.md)
+    throw new Error('embeddings disabled in simplified build');
   }
 
   static async rebuildVectorIndex(_opts: { vectorStore?: any; isDelete?: boolean } = {}) {
@@ -203,21 +134,11 @@ export class AiModelFactory {
       throw new Error('Main AI model configuration not found!');
     }
 
-    const embeddingModel = globalConfig.embeddingModelId
-      ? await AiModelFactory.getAiModel(globalConfig.embeddingModelId, accountId)
-      : null;
-
-    const audioModel = globalConfig.voiceModelId
-      ? await AiModelFactory.getAiModel(globalConfig.voiceModelId, accountId)
-      : null;
-
-    const imageModel = globalConfig.imageModelId
-      ? await AiModelFactory.getAiModel(globalConfig.imageModelId, accountId)
-      : null;
+    // EmbeddingModel / AudioModel / ImageModel removed in simplified build
+    // (CLAUDE.md: no embeddings/RAG, no multi-modal audio/image)
 
     // Initialize providers
     const llmProvider = new LLMProvider();
-    // EmbeddingProvider/AudioProvider removed in simplified build
 
     // Create LLM configuration
     const llmConfig = {
@@ -231,32 +152,6 @@ export class AiModelFactory {
     // Get LLM instance
     const llm = await llmProvider.getLanguageModel(llmConfig);
 
-    // Get Embedding instance (if configured)
-    let embeddings: EmbeddingModelV1<string> | null = null;
-    if (embeddingModel) {
-      const embeddingConfig = {
-        provider: embeddingModel.provider.provider,
-        apiKey: embeddingModel.provider.apiKey,
-        baseURL: embeddingModel.provider.baseURL,
-        modelKey: embeddingModel.modelKey,
-        apiVersion: (embeddingModel.provider.config as any)?.apiVersion
-      };
-      embeddings = await embeddingProvider.getEmbeddingModel(embeddingConfig);
-    }
-
-    // Get Audio instance (if configured)
-    let audio: MastraVoice | null = null;
-    if (audioModel) {
-      const audioConfig = {
-        provider: audioModel.provider.provider,
-        apiKey: audioModel.provider.apiKey,
-        baseURL: audioModel.provider.baseURL,
-        modelKey: audioModel.modelKey,
-        apiVersion: (audioModel.provider.config as any)?.apiVersion
-      };
-      audio = await audioProvider.getAudioModel(audioConfig);
-    }
-
     // Get utilities
     const vectorStore = await AiUtilities.VectorStore();
     const markdownSplitter = AiUtilities.MarkdownSplitter();
@@ -265,15 +160,10 @@ export class AiModelFactory {
     return {
       LLM: llm,
       VectorStore: vectorStore,
-      Embeddings: embeddings,
       MarkdownSplitter: markdownSplitter,
       TokenTextSplitter: tokenTextSplitter,
-      audioModel: audio,
-      // Keep for backward compatibility
       provider: {
-        llmProvider,
-        embeddingProvider,
-        audioProvider
+        llmProvider
       }
     };
   }
