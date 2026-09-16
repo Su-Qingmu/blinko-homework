@@ -1,5 +1,6 @@
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { prisma } from '../prisma';
 import { Prisma } from '@prisma/client';
 import { helper, TagTreeNode } from '@shared/lib/helper';
@@ -809,7 +810,7 @@ export const noteRouter = router({
       if (!originalNote) {
         throw new Error('Note not found or you do not have access');
       }
-      const agent = await AiModelFactory.RelatedNotesAgent();
+       const agent = await AiModelFactory.RelatedNotesAgent(undefined, Number(ctx.id));
       const extractionPrompt = `
         Please extract keywords from the following note content:
         
@@ -953,13 +954,17 @@ export const noteRouter = router({
           select: { metadata: true }
         });
 
-        update.metadata = {
-          //@ts-ignore
-          ...(existingNote?.metadata || {}),
+        // existingNote.metadata 是 String,需先 parse;input.metadata 是 Object
+        const prevMeta = (() => {
+          if (!existingNote?.metadata) return {};
+          try { return JSON.parse(existingNote.metadata as any); } catch { return {}; }
+        })();
+        update.metadata = JSON.stringify({
+          ...prevMeta,
           ...input.metadata
-        };
+        });
       } else if (input.metadata) {
-        update.metadata = input.metadata;
+        update.metadata = JSON.stringify(input.metadata);
       }
 
       if (id) {
@@ -989,13 +994,13 @@ export const noteRouter = router({
               content: existingNote.content,
               version: (latestVersion?.version || 0) + 1,
               accountId: Number(ctx.id),
-              metadata: {
+              metadata: JSON.stringify({
                 type: existingNote.type,
                 isArchived: existingNote.isArchived,
                 isTop: existingNote.isTop,
                 isShare: existingNote.isShare,
                 isRecycle: existingNote.isRecycle,
-              },
+              }),
             },
           });
         }
@@ -1120,8 +1125,10 @@ export const noteRouter = router({
         SendWebhook({ ...note, attachments }, isRecycle ? 'delete' : 'update', ctx);
         return note;
       } else {
+        // 关键写入路径:不让任何后续步骤吞掉 create 失败
+        let note: any;
         try {
-          const note = await prisma.notes.create({
+          note = await prisma.notes.create({
             data: {
               content: content ?? '',
               type,
@@ -1130,9 +1137,17 @@ export const noteRouter = router({
               isTop: isTop ? true : false,
               ...(input.createdAt && { createdAt: input.createdAt }),
               ...(input.updatedAt && { updatedAt: input.updatedAt }),
-              ...(input.metadata && { metadata: input.metadata }),
+              ...(input.metadata && { metadata: JSON.stringify(input.metadata) }),
             },
           });
+        } catch (error: any) {
+          console.error('[note.upsert] prisma.notes.create failed:', error?.message ?? error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `create note failed: ${error?.message ?? 'unknown'}`,
+          });
+        }
+        try {
           await handleAddTags(tagTree, undefined, note.id);
           const attachmentsIds = await prisma.attachments.findMany({ where: { path: { in: attachments.map((i) => i.path) } } });
           await prisma.attachments.updateMany({ where: { id: { in: attachmentsIds.map((i) => i.id) } }, data: { noteId: note.id } });

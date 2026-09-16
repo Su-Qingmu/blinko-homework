@@ -21,9 +21,10 @@ import { inviteRouter } from './invite';
 import { activityRouter } from './activity';
 import { teamNoteRouter } from './teamNote';
 import {
-  notificationRouter, fontRouter, analyticsRouter, mcpServersRouter,
+  notificationRouter, fontRouter, mcpServersRouter,
   aiScheduledTaskRouter, pluginRouter, followsRouter, attachmentsRouter, taskRouter,
 } from './stubs';
+import { analyticsRouter } from './analytics';
 export const appRouter = router({
   ai: aiRouter,
   notes: noteRouter,

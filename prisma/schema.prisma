@@ -35,6 +35,8 @@ model accounts {
   notifications notifications[]
   conversations conversation[]
   sharedNotes   noteInternalShare[]
+  aiProviders   aiProviders[]
+  aiModels      aiModels[]
   // 协作模块反向关系
   ownedTeams         teams[]            @relation("OwnedTeams")
   teamMembers        teamMembers[]
@@ -267,6 +269,7 @@ model session {
 
 model aiProviders {
   id        Int      @id @default(autoincrement())
+  accountId Int?
   title     String
   provider  String
   baseURL   String?
@@ -276,11 +279,15 @@ model aiProviders {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  account   accounts?  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   models    aiModels[]
+
+  @@index([accountId])
 }
 
 model aiModels {
   id            Int      @id @default(autoincrement())
+  accountId     Int?
   providerId    Int
   title         String
   modelKey      String
@@ -291,8 +298,10 @@ model aiModels {
   updatedAt     DateTime @updatedAt
 
   provider      aiProviders @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  account       accounts?   @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@index([providerId])
+  @@index([accountId])
 }
 
 // ============================================================
