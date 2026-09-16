@@ -1,6 +1,7 @@
 import { router, authProcedure } from '../middleware';
 import { z } from 'zod';
 import { prisma } from '../prisma';
+import { parseJsonField, serializeJsonField } from '../lib/jsonField';
 
 export const messageRouter = router({
   create: authProcedure
@@ -16,7 +17,7 @@ export const messageRouter = router({
           content: input.content,
           role: input.role,
           conversationId: input.conversationId,
-          metadata: input.metadata,
+          metadata: input.metadata !== undefined ? serializeJsonField(input.metadata) : null,
         }
       });
     }),
@@ -44,7 +45,7 @@ export const messageRouter = router({
           orderBy: { createdAt: 'asc' }
         })
       ]);
-      return messages;
+      return messages.map((m) => ({ ...m, metadata: parseJsonField(m.metadata) }));
     }),
 
   update: authProcedure
