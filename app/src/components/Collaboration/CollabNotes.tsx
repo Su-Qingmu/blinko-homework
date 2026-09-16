@@ -18,6 +18,7 @@ export const CollabNotes = observer(() => {
   const notes = teamStore.teamNotes.value ?? [];
   const myRole = team?.myRole ?? 'guest';
   const [shareOpen, setShareOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [myNoteList, setMyNoteList] = useState<any[]>([]);
 
   if (!team) return null;
@@ -33,13 +34,22 @@ export const CollabNotes = observer(() => {
     <div className="space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-base font-semibold">{t('collab-notes')}</h2>
-        <Button
-          color="primary" size="sm"
-          startContent={<Icon icon="hugeicons:share-01" width="14" height="14" />}
-          onPress={() => setShareOpen(true)}
-        >
-          {t('collab-notes-share')}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            color="primary" size="sm" variant="flat"
+            startContent={<Icon icon="hugeicons:add-01" width="14" height="14" />}
+            onPress={() => setCreateOpen(true)}
+          >
+            {t('collab-notes-create', 'New note')}
+          </Button>
+          <Button
+            color="primary" size="sm"
+            startContent={<Icon icon="hugeicons:share-01" width="14" height="14" />}
+            onPress={() => setShareOpen(true)}
+          >
+            {t('collab-notes-share')}
+          </Button>
+        </div>
       </div>
 
       {notes.length === 0 ? (
@@ -113,6 +123,13 @@ export const CollabNotes = observer(() => {
         sharedIds={new Set(notes.map((n) => n.noteId))}
         onShared={() => teamStore.teamNotes.call()}
       />
+
+      <CreateNoteDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        teamId={team.id}
+        onCreated={() => teamStore.teamNotes.call()}
+      />
     </div>
   );
 });
@@ -184,6 +201,67 @@ export const ShareNoteDialog = observer(({ open, onOpenChange, teamId, myNoteLis
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="light" onPress={() => onOpenChange(false)}>{t('cancel')}</Button>
           <Button color="primary" isLoading={busy} isDisabled={!picked} onPress={submit}>{t('share')}</Button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+interface CreateProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  teamId: number;
+  onCreated: () => void;
+}
+
+export const CreateNoteDialog = observer(({ open, onOpenChange, teamId, onCreated }: CreateProps) => {
+  const { t } = useTranslation();
+  const teamStore = RootStore.Get(TeamStore);
+  const blinkoStore = RootStore.Get(BlinkoStore);
+  const [content, setContent] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    const text = content.trim();
+    if (!text) return;
+    setBusy(true);
+    try {
+      const res = await teamStore.createNoteInTeam(teamId, text);
+      setContent('');
+      onCreated();
+      onOpenChange(false);
+      // 跳转到新创建的笔记详情页
+      if (res?.noteId) {
+        blinkoStore.noteContent = text;
+        window.location.href = `/?path=notes&id=${res.noteId}`;
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={[
+      'fixed inset-0 z-50 flex items-center justify-center bg-black/40',
+      open ? '' : 'hidden',
+    ].join(' ')}>
+      <div className="bg-background rounded-2xl p-5 w-[560px] max-w-[90vw] shadow-xl">
+        <div className="flex items-center gap-2 mb-3">
+          <Icon icon="hugeicons:add-01" width="20" height="20" className="text-primary" />
+          <h3 className="font-semibold">{t('collab-notes-create', 'New note in team')}</h3>
+        </div>
+        <textarea
+          autoFocus
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder={t('collab-notes-create-placeholder', '写下团队笔记的内容(支持 Markdown)...')}
+          className="w-full h-64 px-3 py-2 rounded-xl border border-default-200 bg-default-50 outline-none focus:border-primary resize-y"
+        />
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="light" onPress={() => onOpenChange(false)}>{t('cancel')}</Button>
+          <Button color="primary" isLoading={busy} isDisabled={!content.trim()} onPress={submit}>
+            {t('create')}
+          </Button>
         </div>
       </div>
     </div>

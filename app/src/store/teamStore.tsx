@@ -290,6 +290,17 @@ export class TeamStore implements Store {
     await this.activity.call();
   }
 
+  /** 在团队里直接创建一条新笔记 */
+  async createNoteInTeam(teamId: number, content: string, type = 0) {
+    const res = await PromiseCall(
+      api.teamNote.createNoteInTeam.mutate({ teamId, content, type }) as any,
+      { successMsg: i18n.t('collab-notes-create-success', 'Note created in team') },
+    );
+    await this.teamNotes.call();
+    await this.activity.call();
+    return res as { noteId: number; teamNoteId: number };
+  }
+
   /** 工具:判断角色等级 (>=) */
   isAtLeast(role: string, required: 'guest' | 'member' | 'admin' | 'owner') {
     const rank: Record<string, number> = { guest: 0, member: 1, admin: 2, owner: 3 };

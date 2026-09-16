@@ -196,4 +196,48 @@ export const teamNoteRouter = router({
       });
       return true;
     }),
+
+  /** 在团队里直接创建一条新笔记(等价于:创建个人笔记 + 立即分享到团队) */
+  createNoteInTeam: authProcedure
+    .input(z.object({
+      teamId: z.number().int(),
+      content: z.string().min(1).max(50_000),
+      type: z.number().int().min(0).max(10).default(0),
+    }))
+    .output(z.object({
+      noteId: z.number().int(),
+      teamNoteId: z.number().int(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const accountId = Number(ctx.id);
+      await requireTeamMember(ctx, input.teamId);
+
+      const result = await prisma.$transaction(async (tx) => {
+        const note = await tx.notes.create({
+          data: {
+            content: input.content,
+            type: input.type,
+            accountId,
+          },
+          select: { id: true },
+        });
+        const teamNote = await tx.teamNotes.create({
+          data: {
+            teamId: input.teamId,
+            noteId: note.id,
+            canEdit: true,
+            sharedById: accountId,
+          },
+          select: { id: true },
+        });
+        return { noteId: note.id, teamNoteId: teamNote.id };
+      });
+
+      await logActivity(input.teamId, accountId, 'note.create', {
+        targetType: 'note',
+        targetId: result.noteId,
+      });
+
+      return result;
+    }),
 });
