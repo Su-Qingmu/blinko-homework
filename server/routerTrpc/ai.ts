@@ -12,6 +12,19 @@ import { aiProviders, aiModels } from '@shared/lib/prismaZodType';
 import { fetchWithProxy } from '@server/lib/proxy';
 import { inferModelCapabilities } from '@shared/lib/modelTemplates';
 
+// SQLite 下 Prisma 不支持原生 Json 类型,capabilities/config 字段存为 String(JSON 文本)
+// 写入前 stringify,读取后 parse,前端可正常当对象用
+function parseJsonField(s: string | null | undefined): any {
+  if (s == null) return null;
+  try { return JSON.parse(s); } catch { return null; }
+}
+function parseModelRow<T extends { capabilities: string; config: string | null }>(row: T): T & { capabilities: any; config: any } {
+  return { ...row, capabilities: parseJsonField(row.capabilities), config: parseJsonField(row.config) };
+}
+function parseProviderRow<T extends { config: string | null }>(row: T): T & { config: any } {
+  return { ...row, config: parseJsonField(row.config) };
+}
+
 export const aiRouter = router({
   embeddingUpsert: authProcedure
     .input(z.object({
@@ -228,7 +241,7 @@ export const aiRouter = router({
         rerank: z.boolean().optional()
       })
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       try {
         const { providerId, modelKey, capabilities } = input;
 
@@ -305,11 +318,12 @@ export const aiRouter = router({
 
   getAllProviders: authProcedure
     .query(async ({ ctx }) => {
-      return await prisma.aiProviders.findMany({
+      const rows = await prisma.aiProviders.findMany({
         where: { accountId: Number(ctx.id) },
         include: { models: true },
         orderBy: { sortOrder: 'asc' }
       });
+      return rows.map((p) => ({ ...parseProviderRow(p), models: p.models.map((m) => parseModelRow(m)) }));
     }),
 
   createProvider: authProcedure
@@ -323,9 +337,9 @@ export const aiRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       return await prisma.aiProviders.create({
-        data: { ...input, accountId: Number(ctx.id) },
+        data: { ...input, accountId: Number(ctx.id), config: input.config !== undefined ? JSON.stringify(input.config) : null },
         include: { models: true }
-      });
+      }).then((p) => parseProviderRow(p));
     }),
 
   updateProvider: authProcedure
@@ -345,9 +359,12 @@ export const aiRouter = router({
       if (!target) throw new TRPCError({ code: 'FORBIDDEN', message: 'provider not found or not yours' });
       return await prisma.aiProviders.update({
         where: { id },
-        data,
+        data: {
+          ...data,
+          ...(data.config !== undefined ? { config: JSON.stringify(data.config) } : {}),
+        },
         include: { models: true }
-      });
+      }).then((p) => parseProviderRow(p));
     }),
 
   deleteProvider: authProcedure
@@ -364,11 +381,12 @@ export const aiRouter = router({
 
   getAllModels: authProcedure
     .query(async ({ ctx }) => {
-      return await prisma.aiModels.findMany({
+      const rows = await prisma.aiModels.findMany({
         where: { accountId: Number(ctx.id) },
         include: { provider: true },
         orderBy: [{ provider: { sortOrder: 'asc' } }, { sortOrder: 'asc' }]
       });
+      return rows.map((m) => ({ ...parseModelRow(m), provider: m.provider ? parseProviderRow(m.provider) : m.provider }));
     }),
 
   getModelsByProvider: authProcedure
@@ -376,11 +394,12 @@ export const aiRouter = router({
       providerId: z.number()
     }))
     .query(async ({ input, ctx }) => {
-      return await prisma.aiModels.findMany({
+      const rows = await prisma.aiModels.findMany({
         where: { providerId: input.providerId, accountId: Number(ctx.id) },
         include: { provider: true },
         orderBy: { sortOrder: 'asc' }
       });
+      return rows.map((m) => ({ ...parseModelRow(m), provider: m.provider ? parseProviderRow(m.provider) : m.provider }));
     }),
 
   getModelsByCapability: authProcedure
@@ -388,7 +407,7 @@ export const aiRouter = router({
       capability: z.string()
     }))
     .query(async ({ input, ctx }) => {
-      return await prisma.aiModels.findMany({
+      const rows = await prisma.aiModels.findMany({
         where: {
           accountId: Number(ctx.id),
           capabilities: { path: [input.capability], equals: true }
@@ -396,6 +415,7 @@ export const aiRouter = router({
         include: { provider: true },
         orderBy: { sortOrder: 'asc' }
       });
+      return rows.map((m) => ({ ...parseModelRow(m), provider: m.provider ? parseProviderRow(m.provider) : m.provider }));
     }),
 
   createModel: authProcedure
@@ -421,9 +441,14 @@ export const aiRouter = router({
       const p = await prisma.aiProviders.findFirst({ where: { id: input.providerId, accountId: Number(ctx.id) }, select: { id: true } });
       if (!p) throw new TRPCError({ code: 'FORBIDDEN', message: 'provider not found or not yours' });
       return await prisma.aiModels.create({
-        data: { ...input, accountId: Number(ctx.id) },
+        data: {
+          ...input,
+          accountId: Number(ctx.id),
+          capabilities: JSON.stringify(input.capabilities),
+          config: input.config !== undefined ? JSON.stringify(input.config) : null,
+        },
         include: { provider: true }
-      });
+      }).then((m) => ({ ...parseModelRow(m), provider: m.provider ? parseProviderRow(m.provider) : m.provider }));
     }),
 
   updateModel: authProcedure
@@ -450,9 +475,13 @@ export const aiRouter = router({
       if (!target) throw new TRPCError({ code: 'FORBIDDEN', message: 'model not found or not yours' });
       return await prisma.aiModels.update({
         where: { id },
-        data,
+        data: {
+          ...data,
+          ...(data.capabilities !== undefined ? { capabilities: JSON.stringify(data.capabilities) } : {}),
+          ...(data.config !== undefined ? { config: JSON.stringify(data.config) } : {}),
+        },
         include: { provider: true }
-      });
+      }).then((m) => ({ ...parseModelRow(m), provider: m.provider ? parseProviderRow(m.provider) : m.provider }));
     }),
 
   deleteModel: authProcedure
@@ -502,7 +531,7 @@ export const aiRouter = router({
             providerId,
             title: model.name,
             modelKey: model.id,
-            capabilities: model.capabilities,
+            capabilities: JSON.stringify(model.capabilities),
             sortOrder: 0,
             accountId: Number(ctx.id)
           },
@@ -511,7 +540,7 @@ export const aiRouter = router({
         createdModels.push(created);
       }
 
-      return createdModels;
+      return createdModels.map((m) => ({ ...parseModelRow(m), provider: m.provider ? parseProviderRow(m.provider) : m.provider }));
     }),
 
   batchCreateModelsFromProvider: authProcedure
@@ -549,7 +578,7 @@ export const aiRouter = router({
             providerId,
             title: model.name,
             modelKey: model.id,
-            capabilities: model.capabilities || {
+            capabilities: JSON.stringify(model.capabilities || {
               inference: true,
               tools: false,
               image: false,
@@ -558,7 +587,7 @@ export const aiRouter = router({
               audio: false,
               embedding: false,
               rerank: false
-            },
+            }),
             sortOrder: 0,
             accountId: Number(ctx.id)
           },
@@ -707,13 +736,11 @@ export const aiRouter = router({
         }
 
         // Update provider config with fetched models
+        const existingConfig = parseJsonField(provider.config) || {};
         await prisma.aiProviders.update({
           where: { id: providerId },
           data: {
-            config: {
-              ...(provider.config as any || {}),
-              models: modelList
-            }
+            config: JSON.stringify({ ...existingConfig, models: modelList })
           }
         });
 
