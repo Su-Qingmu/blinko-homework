@@ -240,4 +240,201 @@ export const teamNoteRouter = router({
 
       return result;
     }),
+
+  /**
+   * 批量分享笔记到多个团队,每个团队可指定成员子集。
+   * 流程:对每个 target → upsert teamNotes → 同步 teamNoteMembers(删除旧 + 插入新)
+   */
+  shareMulti: authProcedure
+    .input(z.object({
+      noteId: z.number().int(),
+      /**
+       * teamId: 目标团队
+       * memberIds: 该团队内被勾选的成员 accountId 列表
+       *   - 不传 / 空数组 = 移除所有成员关联(等同于 unshare)
+       *   - 传全部 = 整个团队可访问
+       */
+      targets: z.array(z.object({
+        teamId: z.number().int(),
+        memberIds: z.array(z.number().int()).default([]),
+      })).min(1).max(20),
+    }))
+    .output(z.object({
+      shared: z.number().int(),
+      removed: z.number().int(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const accountId = Number(ctx.id);
+      // 笔记必须是当前用户的
+      const note = await prisma.notes.findUnique({ where: { id: input.noteId } });
+      if (!note) throw new TRPCError({ code: 'NOT_FOUND', message: 'Note not found' });
+      if (note.accountId !== accountId) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'You can only share your own notes' });
+      }
+      // 校验每个 target 都是当前用户所在团队
+      const teamIds = input.targets.map((t) => t.teamId);
+      const memberships = await prisma.teamMembers.findMany({
+        where: { teamId: { in: teamIds }, accountId },
+      });
+      const allowedTeamIds = new Set(memberships.map((m) => m.teamId));
+      for (const tid of teamIds) {
+        if (!allowedTeamIds.has(tid)) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: `Not a member of team ${tid}`,
+          });
+        }
+      }
+
+      let shared = 0;
+      let removed = 0;
+
+      // 每个 target 独立事务
+      for (const target of input.targets) {
+        const memberSet = new Set(target.memberIds);
+        const result = await prisma.$transaction(async (tx) => {
+          // upsert teamNotes
+          const teamNote = await tx.teamNotes.upsert({
+            where: { teamId_noteId: { teamId: target.teamId, noteId: input.noteId } },
+            update: { canEdit: true },
+            create: {
+              teamId: target.teamId,
+              noteId: input.noteId,
+              canEdit: true,
+              sharedById: accountId,
+            },
+            select: { id: true },
+          });
+          // 同步成员:删除旧 → 插入新
+          const old = await tx.teamNoteMembers.findMany({
+            where: { teamNoteId: teamNote.id },
+            select: { accountId: true },
+          });
+          await tx.teamNoteMembers.deleteMany({ where: { teamNoteId: teamNote.id } });
+          if (memberSet.size > 0) {
+            await tx.teamNoteMembers.createMany({
+              data: Array.from(memberSet).map((aid) => ({
+                teamNoteId: teamNote.id,
+                accountId: aid,
+                canEdit: true,
+              })),
+            });
+          }
+          return { oldCount: old.length, newCount: memberSet.size };
+        });
+        shared += result.newCount;
+        removed += result.oldCount - result.newCount > 0 ? result.oldCount - result.newCount : 0;
+
+        // activity 记录
+        await logActivity(target.teamId, accountId, 'note.share', {
+          targetType: 'note',
+          targetId: input.noteId,
+          metadata: { teamNoteId: result.oldCount + result.newCount, memberCount: memberSet.size },
+        });
+      }
+
+      return { shared, removed };
+    }),
+
+  /**
+   * 列出当前用户可分享到的所有团队(必须是成员)
+   * + 该 note 是否已分享到该团队 + 已分享的成员数
+   */
+  getSharableTeams: authProcedure
+    .input(z.object({ noteId: z.number().int() }))
+    .output(z.array(z.object({
+      teamId: z.number().int(),
+      teamName: z.string(),
+      teamIcon: z.string(),
+      myRole: z.string(),
+      memberCount: z.number().int(),
+      isShared: z.boolean(),
+      sharedMemberCount: z.number().int(),
+    })))
+    .query(async ({ input, ctx }) => {
+      const accountId = Number(ctx.id);
+      // 我所在的团队
+      const myMemberships = await prisma.teamMembers.findMany({
+        where: { accountId },
+        include: {
+          team: { select: { id: true, name: true, icon: true } },
+        },
+      });
+      if (myMemberships.length === 0) return [];
+      const teamIds = myMemberships.map((m) => m.teamId);
+      // 该 note 已被分享到哪些团队
+      const existingShares = await prisma.teamNotes.findMany({
+        where: { noteId: input.noteId, teamId: { in: teamIds } },
+        include: { members: { select: { accountId: true } } },
+      });
+      const shareMap = new Map(existingShares.map((s) => [s.teamId, s]));
+      // 每个团队的成员数
+      const memberCounts = await prisma.teamMembers.groupBy({
+        by: ['teamId'],
+        where: { teamId: { in: teamIds } },
+        _count: { _all: true },
+      });
+      const countMap = new Map(memberCounts.map((c) => [c.teamId, c._count._all]));
+
+      return myMemberships.map((m) => {
+        const share = shareMap.get(m.teamId);
+        return {
+          teamId: m.teamId,
+          teamName: m.team.name,
+          teamIcon: m.team.icon,
+          myRole: m.role,
+          memberCount: countMap.get(m.teamId) ?? 0,
+          isShared: !!share,
+          sharedMemberCount: share?.members.length ?? 0,
+        };
+      });
+    }),
+
+  /**
+   * 列出某团队某笔记已勾选的成员(用于回显分享状态)
+   */
+  getTeamMembersForNote: authProcedure
+    .input(z.object({
+      noteId: z.number().int(),
+      teamId: z.number().int(),
+    }))
+    .output(z.array(z.number().int()))
+    .query(async ({ input, ctx }) => {
+      const accountId = Number(ctx.id);
+      const note = await prisma.notes.findUnique({ where: { id: input.noteId } });
+      if (!note || note.accountId !== accountId) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+      const teamNote = await prisma.teamNotes.findUnique({
+        where: { teamId_noteId: { teamId: input.teamId, noteId: input.noteId } },
+        include: { members: { select: { accountId: true } } },
+      });
+      return teamNote?.members.map((m) => m.accountId) ?? [];
+    }),
+
+  /**
+   * 列出某团队的成员(用于分享时勾选)
+   */
+  getTeamMembers: authProcedure
+    .input(z.object({ teamId: z.number().int() }))
+    .output(z.array(z.object({
+      id: z.number().int(),
+      nickname: z.string(),
+      image: z.string(),
+      role: z.string(),
+    })))
+    .query(async ({ input, ctx }) => {
+      await requireTeamMember(ctx, input.teamId);
+      const members = await prisma.teamMembers.findMany({
+        where: { teamId: input.teamId },
+        include: { account: { select: { id: true, nickname: true, image: true } } },
+        orderBy: { joinedAt: 'asc' },
+      });
+      return members.map((m) => ({
+        id: m.account.id,
+        nickname: m.account.nickname || m.account.id.toString(),
+        image: m.account.image,
+        role: m.role,
+      }));
+    }),
 });

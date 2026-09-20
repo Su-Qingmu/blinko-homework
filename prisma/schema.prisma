@@ -43,6 +43,7 @@ model accounts {
   invitesCreated     inviteLinks[]
   teamActivities     teamActivities[]
   teamNotesShared    teamNotes[]
+  teamNoteMembers    teamNoteMembers[]
 }
 
 model attachments {
@@ -391,9 +392,25 @@ model teamNotes {
   team     teams    @relation(fields: [teamId], references: [id], onDelete: Cascade)
   note     notes    @relation(fields: [noteId], references: [id], onDelete: Cascade)
   sharedBy accounts @relation(fields: [sharedById], references: [id])
+  members  teamNoteMembers[]
 
   @@unique([teamId, noteId])
   @@index([noteId])
+}
+
+/// 团队笔记成员权限表 — 决定哪些成员实际可以访问该团队笔记
+model teamNoteMembers {
+  id         Int      @id @default(autoincrement())
+  teamNoteId Int
+  accountId  Int
+  canEdit    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  teamNote teamNotes @relation(fields: [teamNoteId], references: [id], onDelete: Cascade)
+  account  accounts  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([teamNoteId, accountId])
+  @@index([accountId])
 }
 
 
