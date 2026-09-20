@@ -281,6 +281,35 @@ export class TeamStore implements Store {
     await this.activity.call();
   }
 
+  /** 批量分享笔记到多个团队(每个团队指定成员子集) */
+  async shareNoteToTeams(
+    noteId: number,
+    targets: { teamId: number; memberIds: number[] }[],
+  ) {
+    const res = await PromiseCall(
+      api.teamNote.shareMulti.mutate({ noteId, targets }) as any,
+      { successMsg: i18n.t('collab-notes-share-success') },
+    );
+    await this.teamNotes.call();
+    await this.activity.call();
+    return res as { shared: number; removed: number };
+  }
+
+  /** 加载某笔记可分享的团队列表(用于团队分享对话框) */
+  sharableTeams(noteId: number) {
+    return api.teamNote.getSharableTeams.query({ noteId });
+  }
+
+  /** 加载某团队已分享的成员 id 列表(用于回显) */
+  teamMembersForNote(noteId: number, teamId: number) {
+    return api.teamNote.getTeamMembersForNote.query({ noteId, teamId });
+  }
+
+  /** 加载某团队所有成员 */
+  teamMembers(teamId: number) {
+    return api.teamNote.getTeamMembers.query({ teamId });
+  }
+
   /** 取消分享 */
   async unshareNote(teamId: number, noteId: number) {
     await PromiseCall(

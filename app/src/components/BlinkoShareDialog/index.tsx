@@ -32,6 +32,7 @@ import { api } from "@/lib/trpc";
 import { PublicUser } from "@shared/lib/types";
 import { UserStore } from "@/store/user";
 import { getBlinkoEndpoint } from "@/lib/blinkoEndpoint";
+import { TeamShareDialog } from "../Collaboration/TeamShareDialog";
 
 
 interface ShareDialogProps {
@@ -80,7 +81,7 @@ export const BlinkoShareDialog = observer(({ defaultSettings }: ShareDialogProps
     expiryType: defaultSettings.expiryDate ? "custom" : "never",
     isPublic: defaultSettings.password ? false : true,
     isShare: defaultSettings.isShare ?? false,
-    selectedTab: "public",
+    selectedTab: "public" as "public" | "internal" | "team",
     shareUrl: defaultSettings?.shareUrl ?? '',
     isCalendarOpen: false,
     teamMembers: [] as PublicUser[],
@@ -112,7 +113,7 @@ export const BlinkoShareDialog = observer(({ defaultSettings }: ShareDialogProps
     },
 
     setSelectedTab(tab: string) {
-      this.selectedTab = tab;
+      this.selectedTab = tab as any;
     },
 
     setShareUrl(url: string) {
@@ -256,6 +257,15 @@ export const BlinkoShareDialog = observer(({ defaultSettings }: ShareDialogProps
           >
             <Icon icon="material-symbols:public-off" width="20" height="20" />
             {t("internal-share")}
+          </Button>
+          <Button
+            variant={store.selectedTab === "team" ? "solid" : "light"}
+            color={store.selectedTab === "team" ? "primary" : "default"}
+            className={`py-2 px-4 font-medium text-sm flex items-center gap-2 rounded-lg transition-colors`}
+            onPress={() => store.setSelectedTab("team")}
+          >
+            <Icon icon="hugeicons:share-01" width="20" height="20" />
+            {t("team-share", "Team share")}
           </Button>
         </div>
       </div>
@@ -454,18 +464,32 @@ export const BlinkoShareDialog = observer(({ defaultSettings }: ShareDialogProps
         </div>
       )}
 
-      <div className="w-full flex items-end gap-4 mt-6">
-        {
-          store.isShare && (
-            <Button variant="flat" className="w-full" onPress={store.handleCancelShare}>
-              {t("cancel-share")}
-            </Button>
-          )
-        }
-        <Button color="primary" className="w-full" onPress={store.handleCreateShare}>
-          {t("create-share")}
-        </Button>
-      </div>
+      {store.selectedTab === "team" && (
+        <div className="flex flex-col mt-4 -mx-2 min-h-[420px]">
+          <TeamShareDialog
+            inline
+            open
+            onOpenChange={() => {}}
+            noteId={RootStore.Get(BlinkoStore).curSelectedNote!.id!}
+            onSubmit={() => RootStore.Get(DialogStore).close()}
+          />
+        </div>
+      )}
+
+      {store.selectedTab !== "team" && (
+        <div className="w-full flex items-end gap-4 mt-6">
+          {
+            store.isShare && (
+              <Button variant="flat" className="w-full" onPress={store.handleCancelShare}>
+                {t("cancel-share")}
+              </Button>
+            )
+          }
+          <Button color="primary" className="w-full" onPress={store.handleCreateShare}>
+            {t("create-share")}
+          </Button>
+        </div>
+      )}
     </Card>
   );
 });
