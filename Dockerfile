@@ -14,8 +14,8 @@ COPY tsconfig.json ./
 COPY tsconfig.node.json ./
 COPY tsconfig.blinko.json ./
 
-# 安装依赖
-RUN bun install --frozen-lockfile
+# 安装依赖（不用 --frozen-lockfile，允许 bun 自动同步 lockfile）
+RUN bun install --ignore-scripts
 
 # 生成 Prisma client
 RUN cd prisma && bunx prisma generate
