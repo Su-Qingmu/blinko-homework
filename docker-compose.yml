@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  blinko:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: blinko:latest
+    container_name: blinko
+    ports:
+      # 前端访问 + API + MCP 都在这个端口
+      - "1111:1111"
+    volumes:
+      # SQLite 数据持久化
+      - blinko-data:/app/.blinko
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=http://localhost:1111
+      - NEXT_PUBLIC_BASE_URL=http://localhost:1111
+      - DATABASE_URL=file:/app/.blinko/prisma/dev.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:1111/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  blinko-data:
+    name: blinko-data
