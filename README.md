@@ -39,6 +39,19 @@ bun run dev
 
 访问 http://localhost:5173 。
 
+## Docker 一键启动（推荐）
+
+```bash
+docker pull ghcr.io/su-qingmu/blinko-homework:1.0
+docker compose up -d
+```
+
+启动后访问 <http://localhost:1111>。数据落在命名卷 `blinko-data`，
+删容器不丢。Windows 11 / Apple Silicon / x86 Linux / ARM Linux
+自动按当前机器架构挑选对应镜像变体。
+
+详细文档：[docs/05-Docker部署.md](./docs/05-Docker部署.md)
+
 ## 目录结构
 
 ```
@@ -82,7 +95,7 @@ blinko-homework/
 | 3 | 笔记核心：Note CRUD + 标签 + 搜索 + markdown 渲染 | ⏳ |
 | 4 | 闪念：极简快速输入 + Ctrl+Shift+N | ⏳ |
 | 5 | AI 模块：流式对话 + AI 自动评论 + AI 助手页 | ⏳ |
-| 6 | 部署：Dockerfile + docker-compose + README | ⏳ |
+| 6 | 部署：多架构 Dockerfile + docker-compose + GitHub Actions 发布 | ✅ |
 
 ## 课程文档
 

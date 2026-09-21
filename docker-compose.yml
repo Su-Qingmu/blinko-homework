@@ -1,0 +1,44 @@
+# Blinko-Lite · Docker Compose
+# Usage:
+#   docker compose up -d            # start
+#   docker compose logs -f          # tail logs
+#   docker compose down             # stop (keep data)
+#   docker compose down -v          # stop and wipe data
+#
+# Override any variable via `.env` (same directory) or `export VAR=value`.
+
+services:
+  blinko:
+    image: ghcr.io/su-qingmu/blinko-homework:1.0
+    container_name: blinko
+    restart: unless-stopped
+    ports:
+      - "${BLINKO_PORT:-1111}:1111"
+    environment:
+      NODE_ENV: production
+      PORT: "1111"
+      # SQLite path inside the container. Persisted via the `blinko-data` volume.
+      DATABASE_URL: "file:/app/data/dev.db"
+      # Public URL the app is reached at. Change this if you put Blinko
+      # behind a reverse proxy on a different host/port.
+      NEXTAUTH_URL: "${NEXTAUTH_URL:-http://localhost:1111}"
+      NEXT_PUBLIC_BASE_URL: "${NEXT_PUBLIC_BASE_URL:-http://localhost:1111}"
+      # Replace in production (e.g. `openssl rand -hex 32`).
+      NEXTAUTH_SECRET: "${NEXTAUTH_SECRET:-change-me-please-set-a-real-secret}"
+      # Stage 5 AI features — leave OPENAI_API_KEY empty to disable AI.
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL:-}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-4o-mini}"
+      DISABLE_PWA: "true"
+    volumes:
+      - blinko-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:1111/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  blinko-data:
+    name: blinko-data

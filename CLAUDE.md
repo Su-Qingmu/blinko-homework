@@ -95,7 +95,7 @@ bun run start                     # 生产模式跑 server（需先 build:server
 | 3 | 笔记核心（Note/Tag CRUD + 列表/详情 + markdown + 搜索） | ⏳ |
 | 4 | 闪念（极简快速输入 + Ctrl+Shift+N） | ⏳ |
 | 5 | AI（流式对话 + 自动评论 + AI 助手页） | ⏳ |
-| 6 | Docker 部署 | ⏳ |
+| 6 | Docker 部署 | ✅ |
 
 ## 环境变量
 

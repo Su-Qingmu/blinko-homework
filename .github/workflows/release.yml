@@ -1,0 +1,149 @@
+name: Release
+
+# Triggers:
+#   1. Pushing a tag like `v1.0`, `v1.0.1` … → build multi-arch image
+#      AND create a GitHub Release with auto-generated notes.
+#   2. Manual run from the Actions tab (`workflow_dispatch`) → republish a
+#      given tag without making a new release (e.g. for cache rebuilds).
+#
+# Published artifacts on a `v1.0` tag push:
+#   ghcr.io/<owner>/<repo>:1.0     ← multi-arch manifest (amd64 + arm64)
+#   ghcr.io/<owner>/<repo>:1
+#   ghcr.io/<owner>/<repo>:latest
+#   GitHub Release v1.0 (notes auto-generated from commits)
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to publish (e.g. 1.0 or latest)"
+        required: true
+        default: "latest"
+
+permissions:
+  contents: write   # create the GitHub Release
+  packages: write   # push images to ghcr.io
+
+# Avoid concurrent runs touching the same tags / Release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ------------------------------------------------------------------
+  # 1) Build & push the multi-arch Docker image
+  #    Platforms: linux/amd64 (Windows 11 / Intel / x86 Linux / Intel macOS)
+  #               linux/arm64 (Apple Silicon / ARM Linux / AWS Graviton …)
+  # ------------------------------------------------------------------
+  docker:
+    name: Build & push multi-arch image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            # Strip leading "v" from the git tag (v1.0 → 1.0)
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=${{ steps.tag.outputs.value }}
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=Blinko-Lite
+            org.opencontainers.image.description=AI 笔记 / 闪念 / 对话 · 课设项目
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.vendor=${{ github.repository_owner }}
+
+      - name: Build & push (linux/amd64 + linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
+
+  # ------------------------------------------------------------------
+  # 2) Create the GitHub Release (only on real tag pushes)
+  # ------------------------------------------------------------------
+  release:
+    name: Create GitHub Release
+    needs: docker
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          draft: false
+          body: |
+            ## Docker 镜像
+
+            多架构镜像已发布到 **GitHub Container Registry**（`docker pull` 会自动按当前机器架构挑选 `linux/amd64` 或 `linux/arm64`）：
+
+            ```bash
+            # 直接跑（SQLite 数据落在容器内，删容器即丢）
+            docker run -d \
+              --name blinko \
+              -p 1111:1111 \
+              -e NEXTAUTH_SECRET="$(openssl rand -hex 32)" \
+              -e NEXTAUTH_URL="http://localhost:1111" \
+              -v blinko-data:/app/data \
+              ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+
+            # 推荐：用 docker compose（持久化、配置集中管理）
+            curl -O https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/docker-compose.yml
+            docker compose up -d
+            ```
+
+            启动后访问 <http://localhost:1111>。
+
+            ### 平台支持
+
+            | 架构         | 镜像变体     | 适用                                                    |
+            |--------------|--------------|---------------------------------------------------------|
+            | `linux/amd64` | x86_64       | Windows 11 (Docker Desktop) / x86 Linux / Intel macOS   |
+            | `linux/arm64` | arm64        | Apple Silicon (Docker Desktop) / ARM Linux (树莓派、AWS Graviton …) |
