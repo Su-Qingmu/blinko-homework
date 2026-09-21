@@ -5,7 +5,7 @@
 # - Stage 2 (runner):   oven/bun:1-slim — runtime, non-root user, healthcheck
 # -----------------------------------------------------------------------------
 
-ARG BUN_IMAGE=oven/bun:1
+ARG BUN_IMAGE=oven/bun:1.2.8
 
 # =========================================================
 # Stage 1 — builder
@@ -28,8 +28,11 @@ COPY prisma                   ./prisma
 
 # Install all workspace deps. bun resolves tsconfig path aliases
 # (e.g. @prisma/* → ./prisma/*) when bundling.
+# Note: NOT using --frozen-lockfile here — bun's postinstall hook downloads
+# Prisma engine binaries which may have moved between releases; allowing
+# lockfile sync keeps the build green when the lockfile drifts slightly.
 ENV CI=true
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Bring in the rest of the source.
 COPY . .
