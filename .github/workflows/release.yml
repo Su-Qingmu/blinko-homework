@@ -74,11 +74,16 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
+          # `${{ }}` is GitHub Actions expression syntax, evaluated BEFORE the
+          # metadata-action sees it. The action's own template engine (Handlebars)
+          # is only used for the `value=` / `pattern=` fields. So we pre-evaluate
+          # the enable clause to a literal `true` or `false`, which is what
+          # metadata-action compares against.
           tags: |
             type=raw,value=${{ steps.tag.outputs.value }}
-            type=semver,pattern={{major}}.{{minor}},enable={{startsWith(github.ref, 'refs/tags/v')}}
-            type=semver,pattern={{major}},enable={{startsWith(github.ref, 'refs/tags/v')}}
-            type=raw,value=latest,enable={{startsWith(github.ref, 'refs/tags/v')}}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'push' }}
+            type=semver,pattern={{major}},enable=${{ github.event_name == 'push' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
           labels: |
             org.opencontainers.image.title=Blinko-Lite
             org.opencontainers.image.description=AI 笔记 / 闪念 / 对话 · 课设项目
